@@ -1,10 +1,11 @@
 from typing import Tuple
+
 import jax
 import jax.numpy as jnp
-from mujoco import mjx
-from hydrax.tasks.particle import Particle
-from hydrax.algs import PredictiveSampling
 from flax.struct import dataclass
+from hydrax.algs import PredictiveSampling
+from hydrax.tasks.particle import Particle
+from mujoco import mjx
 
 """
 Collect training data by running the particle tracking task.
@@ -28,7 +29,7 @@ class TrainingData:
     cost: jax.Array
 
 
-def collect_data(ctrl: PredictiveSampling, num_steps) -> TrainingData:
+def collect_data(ctrl: PredictiveSampling, num_steps: int) -> TrainingData:
     """Collect training data by running the particle tracking task."""
     # Set up the optimizer
     policy_params = ctrl.init_params()
@@ -64,7 +65,9 @@ def collect_data(ctrl: PredictiveSampling, num_steps) -> TrainingData:
             cost=cost,
         )
 
-    _, data = jax.lax.scan(_step, (policy_params, mjx_data), jnp.arange(num_steps))
+    _, data = jax.lax.scan(
+        _step, (policy_params, mjx_data), jnp.arange(num_steps)
+    )
     return data
 
 
