@@ -112,13 +112,16 @@ def visualize_dataset(data: TrainingData) -> None:
         while viewer.is_running():
             print(f"  {i+1}/{num_initial_conditions}...", end="\r")
             for t in range(num_steps):
+                st = time.time()
                 mj_data.qpos[:] = data.obs[i, t, :2]
                 mj_data.qvel[:] = data.obs[i, t, 2:]
 
                 mujoco.mj_forward(mj_model, mj_data)
                 viewer.sync()
 
-                time.sleep(0.01)
+                elapsed = time.time() - st
+                if elapsed < mj_model.opt.timestep:
+                    time.sleep(mj_model.opt.timestep - elapsed)
 
             i += 1
             if i == num_initial_conditions:
@@ -128,14 +131,17 @@ def visualize_dataset(data: TrainingData) -> None:
 if __name__ == "__main__":
     # Set some parameters
     num_steps = 100
-    num_initial_conditions = 5
+    num_initial_conditions = 128
 
     # Run data collection
     print("Collecting data...")
+    st = time.time()
     rng = jax.random.key(0)
     rng, data_rng = jax.random.split(rng)
     data_rng = jax.random.split(data_rng, num_initial_conditions)
     data = collect_data(num_steps, data_rng)
+    collection_time = time.time() - st
+    print(f"  Collection time: {collection_time:.2f} s")
     assert data.obs.shape == (num_initial_conditions, num_steps, 4)
 
     # Visualize the collected dataset
