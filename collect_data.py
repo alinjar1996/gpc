@@ -1,3 +1,4 @@
+from functools import partial
 from typing import Tuple
 
 import jax
@@ -29,15 +30,26 @@ class TrainingData:
     cost: jax.Array
 
 
-def collect_data(
-    ctrl: PredictiveSampling, num_steps: int, rng: jax.Array
-) -> TrainingData:
-    """Collect training data by running the particle tracking task."""
+@partial(jax.vmap, in_axes=(None, 0))
+def collect_data(num_steps: int, rng: jax.Array) -> TrainingData:
+    """Collect training data by running the particle tracking task.
+
+    Args:
+        num_steps: The number of steps to simulate.
+        rng: The random number generator key for setting the initial conditions.
+
+    Returns:
+        The collected training data.
+    """
+    # Set up the task and control algorithm
+    task = Particle()
+    ctrl = PredictiveSampling(task, num_samples=128, noise_level=0.2)
+
     # Set up the optimizer
     policy_params = ctrl.init_params()
 
     # Set up the simulator (which matches the controller's model exactly)
-    mjx_model = ctrl.task.model
+    mjx_model = task.model
     mjx_data = mjx.make_data(mjx_model)
 
     # Reset to a random initial state
@@ -77,18 +89,15 @@ def collect_data(
 
 
 if __name__ == "__main__":
-    # Set up the task and control algorithm
-    task = Particle()
-    ctrl = PredictiveSampling(task, num_samples=128, noise_level=0.2)
+    # Set some parameters
+    num_steps = 100
+    num_initial_conditions = 10
 
     # Run data collection
     rng = jax.random.key(0)
     rng, data_rng = jax.random.split(rng)
-    rng, data_rng = jax.random.split(rng)
-    data = collect_data(ctrl, num_steps=100, rng=data_rng)
-
-    print(data.obs[0], data.cost[0])
-    print(data.obs[-1], data.cost[-1])
+    data_rng = jax.random.split(data_rng, num_initial_conditions)
+    data = collect_data(num_steps, data_rng)
 
     print(data.obs.shape)
     print(data.old_action_sequence.shape)
