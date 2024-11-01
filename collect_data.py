@@ -1,9 +1,14 @@
+import time
 from functools import partial
 from typing import Tuple
 
 import jax
 import jax.numpy as jnp
+import mujoco
+import mujoco.viewer
+import numpy as np
 from flax.struct import dataclass
+from hydrax import ROOT
 from hydrax.algs import PredictiveSampling
 from hydrax.tasks.particle import Particle
 from mujoco import mjx
@@ -88,18 +93,51 @@ def collect_data(num_steps: int, rng: jax.Array) -> TrainingData:
     return data
 
 
+def visualize_dataset(data: TrainingData) -> None:
+    """Visualize the collected training data on the mujoco viewer.
+
+    Args:
+        data: The training data, size (num_initial_conditions, num_steps, ...).
+    """
+    xml_path = ROOT + "/models/particle/scene.xml"
+    mj_model = mujoco.MjModel.from_xml_path(xml_path)
+    mj_data = mujoco.MjData(mj_model)
+    mj_data.mocap_pos = np.zeros((1, 3))
+
+    num_initial_conditions = data.obs.shape[0]
+    num_steps = data.obs.shape[1]
+
+    with mujoco.viewer.launch_passive(mj_model, mj_data) as viewer:
+        i = 0
+        while viewer.is_running():
+            print(f"  {i+1}/{num_initial_conditions}...", end="\r")
+            for t in range(num_steps):
+                mj_data.qpos[:] = data.obs[i, t, :2]
+                mj_data.qvel[:] = data.obs[i, t, 2:]
+
+                mujoco.mj_forward(mj_model, mj_data)
+                viewer.sync()
+
+                time.sleep(0.01)
+
+            i += 1
+            if i == num_initial_conditions:
+                i = 0
+
+
 if __name__ == "__main__":
     # Set some parameters
     num_steps = 100
-    num_initial_conditions = 10
+    num_initial_conditions = 5
 
     # Run data collection
+    print("Collecting data...")
     rng = jax.random.key(0)
     rng, data_rng = jax.random.split(rng)
     data_rng = jax.random.split(data_rng, num_initial_conditions)
     data = collect_data(num_steps, data_rng)
+    assert data.obs.shape == (num_initial_conditions, num_steps, 4)
 
-    print(data.obs.shape)
-    print(data.old_action_sequence.shape)
-    print(data.new_action_sequence.shape)
-    print(data.cost.shape)
+    # Visualize the collected dataset
+    print("Visualizing data...")
+    visualize_dataset(data)
