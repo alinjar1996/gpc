@@ -115,6 +115,13 @@ def train_simple_policy(data: TrainingData, rng: jax.Array) -> None:
             f"Time: {time.time() - st:.2f} s"
         )
 
+    # Save the model
+    fname = "/tmp/simple_policy.pkl"
+    with open(fname, "wb") as f:
+        save_dict = {"net": model, "params": params}
+        pickle.dump(save_dict, f)
+    print(f"Model saved to {fname}")
+
 
 if __name__ == "__main__":
     # Load the dataset
