@@ -7,6 +7,8 @@ import mujoco
 import mujoco.viewer
 from hydrax import ROOT
 
+from train import MLP, ScoreMLP
+
 """
 Test a trained model with an interactive sim.
 """
@@ -19,6 +21,8 @@ def test_simple_policy() -> None:
         data = pickle.load(f)
     model = data["net"]
     params = data["params"]
+    assert isinstance(model, MLP)
+
     jit_policy = jax.jit(lambda obs: model.apply(params, obs))
 
     # Set up the mujoco simultion
@@ -50,6 +54,8 @@ def test_gpc_policy() -> None:
         data = pickle.load(f)
     model = data["net"]
     params = data["params"]
+    assert isinstance(model, ScoreMLP)
+
     jit_policy = jax.jit(
         lambda old_actions, obs: model.apply(params, old_actions, obs),
         donate_argnames=("old_actions",),

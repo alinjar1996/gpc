@@ -132,7 +132,7 @@ def visualize_dataset(data: TrainingData) -> None:
 if __name__ == "__main__":
     # Set some parameters
     num_steps = 100
-    num_initial_conditions = 128
+    num_initial_conditions = 32
 
     # Run data collection
     print("Collecting data...")
