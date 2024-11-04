@@ -1,3 +1,4 @@
+import pickle
 import time
 from functools import partial
 from typing import Tuple
@@ -147,3 +148,8 @@ if __name__ == "__main__":
     # Visualize the collected dataset
     print("Visualizing data...")
     visualize_dataset(data)
+
+    # Save the dataset to a file
+    print("Saving data...")
+    with open("/tmp/gpc_particle_data.pkl", "wb") as f:
+        pickle.dump(data, f)
