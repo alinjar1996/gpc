@@ -1,6 +1,36 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "gpc"
+version = "0.0.1"
+description = "Generative Predictive Control"
+readme = "README.md"
+license = {text="MIT"}
+requires-python = ">=3.12.0"
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Programming Language :: Python",
+]
+dependencies = [
+    "hydrax",
+    "jax[cuda12]==0.4.35",
+    "flax==0.10.0",
+    "pytest==8.3.3",
+    "ruff==0.7.1",
+    "pre-commit==4.0.1",
+    "matplotlib==3.9.2",
+    "mujoco==3.2.4",
+    "mujoco-mjx==3.2.4",
+    "evosax==0.1.6",
+    "optax==0.2.3",
+]
+
+[tool.ruff]
 line-length = 80
 
-[lint]
+[tool.ruff.lint]
 pydocstyle.convention = "google"
 select = [
     "ANN",  # annotations
@@ -33,15 +63,23 @@ ignore = [
     "PLR2004",  # magic value used in comparison
 ]
 
-[lint.isort]
+[tool.ruff.lint.isort]
 combine-as-imports = true
 known-first-party = ["hydra"]
 split-on-trailing-comma = false
 
-[format]
+[tool.ruff.format]
 quote-style = "double"
 indent-style = "space"
 skip-magic-trailing-comma = false
 line-ending = "auto"
 docstring-code-format = true
 docstring-code-line-length = "dynamic"
+
+[tool.pytest.ini_options]
+testpaths = [
+    "tests",
+]
+
+[tool.setuptools]
+packages = ["gpc"]
