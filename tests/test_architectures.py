@@ -4,7 +4,7 @@ from pathlib import Path
 import jax
 import jax.numpy as jnp
 
-from gpc.architectures import MLP, print_module_summary
+from gpc.architectures import MLP, ScoreMLP, print_module_summary
 
 
 def test_mlp_construction() -> None:
@@ -78,6 +78,36 @@ def test_mlp_save_load() -> None:
     local_dir.rmdir()
 
 
+def test_score_mlp() -> None:
+    """Test a simple MLP score network."""
+    rng = jax.random.key(0)
+
+    # Network parameters
+    batch = 8
+    horizon = 5
+    num_actions = 2
+    num_obs = 3
+
+    # Dummy inputs
+    U = jnp.zeros((batch, horizon, num_actions))
+    y = jnp.zeros((batch, num_obs))
+
+    # Create the network
+    net = ScoreMLP(
+        num_steps=horizon, action_dim=num_actions, hidden_layers=[64, 64]
+    )
+    params = net.init(rng, U, y)
+
+    # Test the forward pass
+    s = net.apply(params, U, y)
+    assert s.shape == U.shape
+
+    # Try with just a single data point
+    s = net.apply(params, U[0], y[0])
+    assert s.shape == (horizon, num_actions)
+
+
 if __name__ == "__main__":
-    test_mlp_construction()
-    test_mlp_save_load()
+    # test_mlp_construction()
+    # test_mlp_save_load()
+    test_score_mlp()
