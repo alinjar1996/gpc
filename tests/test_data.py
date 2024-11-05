@@ -41,6 +41,7 @@ def test_collect_data() -> None:
         5,
         2,
     )
+    assert dataset.state.qpos.shape == (num_resets, num_timesteps, 2)
 
     if __name__ == "__main__":
         # Only visualize the data if running this script directly

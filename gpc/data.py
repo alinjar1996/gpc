@@ -25,11 +25,13 @@ class TrainingData:
         observation: The current observation.
         old_action_sequence: The previous action sequence.
         new_action_sequence: The updated action sequence.
+        state: The full simulator state.
     """
 
     observation: jax.Array
     old_action_sequence: jax.Array
     new_action_sequence: jax.Array
+    state: mjx.Data
 
 
 def collect_data(
@@ -85,6 +87,7 @@ def collect_data(
 
             # Observations are sorted by randomization, rollout, time
             obs = rollouts.observations[0, 0, 0]
+            start_state = mjx_data
 
             # Apply the first control action
             u = ctrl.get_action(policy_params, 0.0)
@@ -94,6 +97,7 @@ def collect_data(
                 observation=obs,
                 old_action_sequence=old_actions,
                 new_action_sequence=new_actions,
+                state=start_state,
             )
 
         _, data = jax.lax.scan(
@@ -112,7 +116,12 @@ def visualize_data(
     task: Task,
     data: TrainingData,
 ) -> None:
-    """Play back the training data on the mujoco visualizer."""
+    """Play back the training data on the mujoco visualizer.
+
+    Args:
+        task: The task definition, including the mujoco model.
+        data: The training data to visualize.
+    """
     mj_model = task.mj_model
     mj_data = mujoco.MjData(mj_model)
     mujoco.mj_forward(mj_model, mj_data)
@@ -126,9 +135,10 @@ def visualize_data(
             for t in range(num_timesteps):
                 st = time.time()
 
-                # TODO: generalize observation to mj_data
-                mj_data.qpos[:] = data.observation[i, t, :2]
-                mj_data.qvel[:] = data.observation[i, t, 2:]
+                mj_data.qpos = data.state.qpos[i, t, ...]
+                mj_data.qvel = data.state.qvel[i, t, ...]
+                mj_data.mocap_pos = data.state.mocap_pos[i, t, ...]
+                mj_data.mocap_quat = data.state.mocap_quat[i, t, ...]
 
                 mujoco.mj_forward(mj_model, mj_data)
                 viewer.sync()
