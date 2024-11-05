@@ -1,4 +1,7 @@
+from pathlib import Path
+
 import jax
+import jax.numpy as jnp
 from hydrax.algs import PredictiveSampling
 from hydrax.tasks.particle import Particle
 from mujoco import mjx
@@ -46,6 +49,31 @@ def test_collect_data() -> None:
     if __name__ == "__main__":
         # Only visualize the data if running this script directly
         visualize_data(task, dataset)
+
+
+def test_save_data() -> None:
+    """Test saving a dataset to disc."""
+    # Make some fake data
+    dataset = TrainingData(
+        observation=jnp.zeros((4, 5)),
+        old_action_sequence=jnp.zeros((5, 2)),
+        new_action_sequence=jnp.zeros((5, 2)),
+        state=jnp.zeros((2,)),
+    )
+
+    # Create a temporary file to save the data
+    local_dir = Path("_test_save_data")
+    local_dir.mkdir(parents=True, exist_ok=True)
+    path = local_dir / "test_data.pkl"
+
+    # Save the data to the file
+    dataset.save(path)
+    assert path.is_file()
+
+    # Clean up the temporary file
+    for file in local_dir.iterdir():
+        file.unlink()
+    local_dir.rmdir()
 
 
 if __name__ == "__main__":

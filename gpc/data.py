@@ -1,5 +1,7 @@
+import pickle
 import time
-from typing import Callable, Tuple
+from pathlib import Path
+from typing import Callable, Tuple, Union
 
 import jax
 import jax.numpy as jnp
@@ -32,6 +34,15 @@ class TrainingData:
     old_action_sequence: jax.Array
     new_action_sequence: jax.Array
     state: mjx.Data
+
+    def save(self, path: Union[str, Path]) -> None:
+        """Save the training data to a file.
+
+        Args:
+            path: The file path to save the data to.
+        """
+        with open(path, "wb") as f:
+            pickle.dump(self, f)
 
 
 def collect_data(
