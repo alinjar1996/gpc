@@ -58,21 +58,19 @@ class ScoreMLP(nn.Module):
     sequence and y is the initial observation.
 
     Args:
-        num_steps: The number of steps in the action sequence.
-        action_dim: The dimensionality of the action space.
         hidden_layers: Sizes of all hidden layers.
 
     """
 
-    num_steps: int
-    action_dim: int
     hidden_layers: Sequence[int]
 
     @nn.compact
     def __call__(self, u: jax.Array, y: jax.Array) -> jax.Array:
         """Forward pass through the network."""
         batches = u.shape[:-2]
-        u_flat = u.reshape(batches + (self.num_steps * self.action_dim,))
+        num_steps = u.shape[-2]
+        action_dim = u.shape[-1]
+        u_flat = u.reshape(batches + (num_steps * action_dim,))
         x = jnp.concatenate([u_flat, y], axis=-1)
-        x = MLP(self.hidden_layers + (self.num_steps * self.action_dim,))(x)
-        return x.reshape((batches) + (self.num_steps, self.action_dim))
+        x = MLP(self.hidden_layers + (num_steps * action_dim,))(x)
+        return x.reshape((batches) + (num_steps, action_dim))
