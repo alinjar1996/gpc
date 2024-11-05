@@ -3,7 +3,7 @@ from hydrax.algs import PredictiveSampling
 from hydrax.tasks.particle import Particle
 from mujoco import mjx
 
-from gpc.data import collect_data
+from gpc.data import TrainingData, collect_data, visualize_data
 
 
 def test_collect_data() -> None:
@@ -27,6 +27,7 @@ def test_collect_data() -> None:
         task, ctrl, num_timesteps, num_resets, _reset_fn, reset_rng
     )
 
+    assert isinstance(dataset, TrainingData)
     assert dataset.observation.shape == (num_resets, num_timesteps, 4)
     assert dataset.old_action_sequence.shape == (
         num_resets,
@@ -40,6 +41,10 @@ def test_collect_data() -> None:
         5,
         2,
     )
+
+    if __name__ == "__main__":
+        # Only visualize the data if running this script directly
+        visualize_data(task, dataset)
 
 
 if __name__ == "__main__":

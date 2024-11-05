@@ -1,7 +1,10 @@
+import time
 from typing import Callable, Tuple
 
 import jax
 import jax.numpy as jnp
+import mujoco
+import mujoco.viewer
 from flax.struct import dataclass
 from hydrax.alg_base import SamplingBasedController
 from hydrax.task_base import Task
@@ -110,4 +113,30 @@ def visualize_data(
     data: TrainingData,
 ) -> None:
     """Play back the training data on the mujoco visualizer."""
-    pass
+    mj_model = task.mj_model
+    mj_data = mujoco.MjData(mj_model)
+    mujoco.mj_forward(mj_model, mj_data)
+
+    num_resets, num_timesteps, _ = data.observation.shape
+
+    with mujoco.viewer.launch_passive(mj_model, mj_data) as viewer:
+        i = 0
+        while viewer.is_running():
+            print(f"  {i+1}/{num_resets}...", end="\r")
+            for t in range(num_timesteps):
+                st = time.time()
+
+                # TODO: generalize observation to mj_data
+                mj_data.qpos[:] = data.observation[i, t, :2]
+                mj_data.qvel[:] = data.observation[i, t, 2:]
+
+                mujoco.mj_forward(mj_model, mj_data)
+                viewer.sync()
+
+                elapsed = time.time() - st
+                if elapsed < mj_model.opt.timestep:
+                    time.sleep(mj_model.opt.timestep - elapsed)
+
+            i += 1
+            if i == num_resets:
+                i = 0
