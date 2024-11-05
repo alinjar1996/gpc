@@ -263,7 +263,7 @@ if __name__ == "__main__":
     rng, train_rng = jax.random.split(rng)
 
     # Train a simple RL-style policy
-    train_simple_policy(data, train_rng)
+    # train_simple_policy(data, train_rng)
 
     # Train a generative model policy
-    # train_gpc(data, train_rng)
+    train_gpc(data, train_rng)

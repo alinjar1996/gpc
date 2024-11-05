@@ -49,7 +49,7 @@ def collect_data(num_steps: int, rng: jax.Array) -> TrainingData:
     """
     # Set up the task and control algorithm
     task = Particle()
-    ctrl = PredictiveSampling(task, num_samples=128, noise_level=0.2)
+    ctrl = PredictiveSampling(task, num_samples=8, noise_level=0.5)
 
     # Set up the optimizer
     policy_params = ctrl.init_params()
@@ -132,7 +132,7 @@ def visualize_dataset(data: TrainingData) -> None:
 if __name__ == "__main__":
     # Set some parameters
     num_steps = 100
-    num_initial_conditions = 32
+    num_initial_conditions = 8
 
     # Run data collection
     print("Collecting data...")

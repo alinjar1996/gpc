@@ -22,7 +22,7 @@ def test_predictive_sampling() -> None:
     """Test the original predictive sampling alg."""
     # Set up the policy
     task = Particle()
-    ctrl = PredictiveSampling(task, num_samples=128, noise_level=0.2)
+    ctrl = PredictiveSampling(task, num_samples=8, noise_level=0.5)
     policy_params = ctrl.init_params()
     mjx_data = mjx.make_data(task.model)
     jit_policy = jax.jit(
@@ -143,7 +143,7 @@ def test_gpc_policy() -> None:
     actions = jnp.zeros((1, 5, 2))
 
     # Set a run time (seconds)
-    run_time = 10
+    run_time = 100
     total_cost = 0.0
 
     # Run the simulation
@@ -175,6 +175,6 @@ def test_gpc_policy() -> None:
 
 
 if __name__ == "__main__":
-    test_predictive_sampling()
+    # test_predictive_sampling()
     # test_simple_policy()
-    # test_gpc_policy()
+    test_gpc_policy()
