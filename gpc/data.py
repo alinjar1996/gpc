@@ -44,6 +44,19 @@ class TrainingData:
         with open(path, "wb") as f:
             pickle.dump(self, f)
 
+    @staticmethod
+    def load(path: Union[Path, str]) -> "TrainingData":
+        """Load training data from a file.
+
+        Args:
+            path: The path to load the data from.
+
+        Returns:
+            The loaded training data instance.
+        """
+        with open(path, "rb") as f:
+            return pickle.load(f)
+
 
 def collect_data(
     task: Task,
