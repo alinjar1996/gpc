@@ -17,7 +17,7 @@ def test_interactive(task: Task, policy: Policy) -> None:
         task: The task to run the policy on.
         policy: The GPC policy to test.
     """
-    jit_policy = jax.jit(policy.apply, donate_argnums=(0,))
+    jit_policy = jax.jit(policy.apply)
 
     # Set up the mujoco simultion
     mj_model = task.mj_model
@@ -51,7 +51,7 @@ def test_interactive(task: Task, policy: Policy) -> None:
 
             # Update the action sequence
             inference_start = time.time()
-            actions = jit_policy(0.0 * actions, obs)
+            actions = jit_policy(obs)
             mj_data.ctrl[:] = actions[0]
 
             obs_time = inference_start - st

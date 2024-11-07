@@ -56,8 +56,8 @@ class Policy:
         with open(path, "rb") as f:
             return pickle.load(f)
 
-    def apply(self, u: jax.Array, y: jax.Array) -> jax.Array:
-        """Apply the policy, updating the action sequence.
+    def apply(self, y: jax.Array) -> jax.Array:
+        """Apply the policy, generating an action sequence.
 
         Args:
             u: The current action sequence.
@@ -66,7 +66,7 @@ class Policy:
         Returns:
             The updated action sequence
         """
-        u_new = self.net.apply(self.params, u, y)
+        u_new = self.net.apply(self.params, y)
         return jax.numpy.clip(u_new, self.u_min, self.u_max)
 
 
@@ -102,17 +102,15 @@ def train(
 
     # Reshape the data to flatten across initial states
     # TODO: shuffle and train-test split
-    old_actions = 0.0 * data.old_action_sequence.reshape(-1, horizon, act_dim)
-    new_actions = data.new_action_sequence.reshape(-1, horizon, act_dim)
+    act = data.new_action_sequence.reshape(-1, horizon, act_dim)
     obs = data.observation.reshape(-1, obs_dim)
 
-    num_data_points = old_actions.shape[0]
-    assert new_actions.shape[0] == num_data_points
+    num_data_points = act.shape[0]
     assert obs.shape[0] == num_data_points
 
     # Initialize the model
     rng, init_rng = jax.random.split(rng)
-    params = net.init(init_rng, old_actions[0], obs[0])
+    params = net.init(init_rng, obs[0])
 
     # Set up the optimizer
     optimizer = optax.adam(learning_rate)
@@ -121,13 +119,12 @@ def train(
     # Define loss and parameter update functions
     def loss_fn(
         params: Params,
-        old_actions: jax.Array,
         obs: jax.Array,
-        new_actions: jax.Array,
+        act: jax.Array,
     ) -> jax.Array:
         """Loss function drives network to predict the new actions."""
-        pred = net.apply(params, old_actions, obs)
-        return jnp.mean((pred - new_actions) ** 2)
+        pred = net.apply(params, obs)
+        return jnp.mean((pred - act) ** 2)
 
     loss_and_grad = jax.value_and_grad(loss_fn)
 
@@ -135,12 +132,11 @@ def train(
     def update_fn(
         params: Params,
         opt_state: optax.OptState,
-        old_actions: jax.Array,
         obs: jax.Array,
-        new_actions: jax.Array,
+        act: jax.Array,
     ) -> Tuple[Params, optax.OptState, jax.Array]:
         """Perform a gradient descent step."""
-        loss, grad = loss_and_grad(params, old_actions, obs, new_actions)
+        loss, grad = loss_and_grad(params, obs, act)
         updates, opt_state = optimizer.update(grad, opt_state)
         params = optax.apply_updates(params, updates)
         return params, opt_state, loss
@@ -155,17 +151,15 @@ def train(
             batch_idx = jax.random.randint(
                 batch_rng, (batch_size,), 0, num_data_points
             )
-            batch_old_actions = old_actions[batch_idx]
             batch_obs = obs[batch_idx]
-            batch_new_actions = new_actions[batch_idx]
+            batch_act = act[batch_idx]
 
             # Do an optimizer step
             params, opt_state, loss = update_fn(
                 params,
                 opt_state,
-                batch_old_actions,
                 batch_obs,
-                batch_new_actions,
+                batch_act,
             )
 
         # TODO: more systematic logging

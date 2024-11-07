@@ -74,3 +74,27 @@ class ScoreMLP(nn.Module):
         x = jnp.concatenate([u_flat, y], axis=-1)
         x = MLP(self.hidden_layers + (num_steps * action_dim,))(x)
         return x.reshape((batches) + (num_steps, action_dim))
+
+
+class ActionSequenceMLP(nn.Module):
+    """A pickle-able module for generating action.
+
+    Generates an action sequence U = NNet(y), where y is the observation. The
+    action sequence has shape (num_steps, action_dim).
+
+    Args:
+        hidden_layers: Sizes of all hidden layers.
+        num_steps: Number of steps in the action sequence.
+        action_dim: Dimension of the action space.
+    """
+
+    hidden_layers: Sequence[int]
+    num_steps: int
+    action_dim: int
+
+    @nn.compact
+    def __call__(self, y: jax.Array) -> jax.Array:
+        """Forward pass through the network."""
+        batches = y.shape[:-1]
+        x = MLP(self.hidden_layers + (self.num_steps * self.action_dim,))(y)
+        return x.reshape(batches + (self.num_steps, self.action_dim))
