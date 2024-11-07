@@ -10,10 +10,12 @@ from gpc.training import Policy, train
 
 def reset_fn(mjx_data: mjx.Data, rng: jax.Array) -> mjx.Data:
     """Sample a random initial state for the particle."""
-    rng, pos_rng, vel_rng = jax.random.split(rng, 3)
+    rng, pos_rng, vel_rng, mocap_rng = jax.random.split(rng, 4)
     qpos = jax.random.uniform(pos_rng, (2,), minval=-0.29, maxval=0.29)
     qvel = jax.random.uniform(vel_rng, (2,), minval=-0.5, maxval=0.5)
-    return mjx_data.replace(qpos=qpos, qvel=qvel)
+    target = jax.random.uniform(mocap_rng, (2,), minval=-0.29, maxval=0.29)
+    mocap_pos = mjx_data.mocap_pos.at[0, 0:2].set(target)
+    return mjx_data.replace(qpos=qpos, qvel=qvel, mocap_pos=mocap_pos)
 
 
 def gather_dataset(
@@ -60,10 +62,10 @@ def test(policy_fname: str = "/tmp/gpc_particle_policy.pkl") -> None:
 
 if __name__ == "__main__":
     # Run predictive sampling and save out the dataset.
-    # gather_dataset(visualize=True)
+    gather_dataset(visualize=True)
 
     # Train a GPC policy on the dataset and save the policy.
     # train_policy()
 
     # Load the saved policy and test with an interactive simulation.
-    test()
+    # test()

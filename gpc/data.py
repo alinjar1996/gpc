@@ -80,7 +80,7 @@ def collect_data(
         The collected training data, shape (num_resets, num_timesteps, ...).
     """
     policy_params = ctrl.init_params()
-    jit_reset = jax.jit(reset_fn, donate_argnums=(0,))
+    jit_reset = jax.jit(reset_fn)
 
     # Set up the simulator (which matches the controller's model exactly)
     mjx_model = task.model
@@ -130,7 +130,7 @@ def collect_data(
         return data
 
     reset_rngs = jax.random.split(rng, num_resets)
-    data = jax.vmap(_collect_one_rollout, in_axes=(0, None))(
+    data = jax.jit(jax.vmap(_collect_one_rollout, in_axes=(0, None)))(
         reset_rngs, mjx_data
     )
     return data
