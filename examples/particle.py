@@ -4,7 +4,8 @@ from hydrax.tasks.particle import Particle
 from mujoco import mjx
 
 from gpc.data import TrainingData, collect_data, visualize_data
-from gpc.training import train
+from gpc.test import test_interactive
+from gpc.training import Policy, train
 
 
 def reset_fn(mjx_data: mjx.Data, rng: jax.Array) -> mjx.Data:
@@ -50,9 +51,19 @@ def train_policy(
     print(f"Policy saved to {policy_fname}")
 
 
+def test(policy_fname: str = "/tmp/gpc_particle_policy.pkl") -> None:
+    """Test the trained policy interactively."""
+    task = Particle()
+    policy = Policy.load(policy_fname)
+    test_interactive(task, policy)
+
+
 if __name__ == "__main__":
     # Run predictive sampling and save out the dataset.
-    gather_dataset(visualize=True)
+    # gather_dataset(visualize=True)
 
-    # Train a GPC policy on the dataset.
-    train_policy()
+    # Train a GPC policy on the dataset and save the policy.
+    # train_policy()
+
+    # Load the saved policy and test with an interactive simulation.
+    test()
