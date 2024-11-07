@@ -1,4 +1,4 @@
-import time
+import sys
 
 import jax
 import jax.numpy as jnp
@@ -6,10 +6,9 @@ from hydrax.algs import PredictiveSampling
 from hydrax.tasks.cart_pole import CartPole
 from mujoco import mjx
 
-from gpc.architectures import ActionSequenceMLP
-from gpc.dataset import TrainingData, collect_data, visualize_data
 from gpc.testing import test_interactive
-from gpc.training import Policy, train
+from gpc.training import Policy
+from gpc.utils import generate_dataset_and_save, train_policy_and_save
 
 
 def reset_fn(mjx_data: mjx.Data, rng: jax.Array) -> mjx.Data:
@@ -24,58 +23,36 @@ def reset_fn(mjx_data: mjx.Data, rng: jax.Array) -> mjx.Data:
     return mjx_data.replace(qpos=qpos, qvel=qvel)
 
 
-def gather_dataset(
-    fname: str = "/tmp/gpc_cart_pole_data.pkl", visualize: bool = True
-) -> None:
-    """Gather a dataset for training the GPC policy."""
-    print("Collecting data...")
-    rng = jax.random.key(0)
-    num_timesteps = 200
-    num_resets = 128
+if __name__ == "__main__":
+    usage_msg = f"Usage: python {sys.argv[0]} [generate|fit|deploy]"
 
+    if len(sys.argv) < 2:
+        print(usage_msg)
+        sys.exit(1)
+
+    # Set parameters
     task = CartPole()
     ctrl = PredictiveSampling(task, num_samples=128, noise_level=0.3)
+    num_timesteps = 200
+    num_resets = 128
+    hidden_layers = [64, 64]
 
-    st = time.time()
-    rng, reset_rng = jax.random.split(rng)
-    dataset = collect_data(
-        task, ctrl, num_timesteps, num_resets, reset_fn, reset_rng
-    )
-    elapsed = time.time() - st
-
-    N = num_resets * num_timesteps
-    print(f"  Collected {N} data points in {elapsed:.2f}s")
-
-    dataset.save(fname)
-    print(f"  Dataset saved to {fname}")
-
-    if visualize:
-        visualize_data(task, dataset)
-
-
-def train_policy(
-    dataset_fname: str = "/tmp/gpc_cart_pole_data.pkl",
-    policy_fname: str = "/tmp/gpc_cart_pole_policy.pkl",
-) -> None:
-    """Train a GPC policy and save it to a file."""
-    print("Training policy...")
-    task = CartPole()
-    dataset = TrainingData.load(dataset_fname)
-    net = ActionSequenceMLP([64, 64], task.planning_horizon, task.model.nu)
-    policy = train(dataset, task, net)
-    policy.save(policy_fname)
-    print(f"  Policy saved to {policy_fname}")
-
-
-def test(policy_fname: str = "/tmp/gpc_cart_pole_policy.pkl") -> None:
-    """Test the GPC policy interactively."""
-    print("Testing policy...")
-    policy = Policy.load(policy_fname)
-    task = CartPole()
-    test_interactive(task, policy)
-
-
-if __name__ == "__main__":
-    gather_dataset()
-    train_policy()
-    test()
+    if sys.argv[1] == "generate":
+        generate_dataset_and_save(
+            task,
+            ctrl,
+            reset_fn,
+            num_timesteps,
+            num_resets,
+            fname="/tmp/gpc_cart_pole_data.pkl",
+        )
+    elif sys.argv[1] == "fit":
+        train_policy_and_save(
+            task,
+            dataset_fname="/tmp/gpc_cart_pole_data.pkl",
+            policy_fname="/tmp/gpc_cart_pole_policy.pkl",
+            hidden_layers=hidden_layers,
+        )
+    elif sys.argv[1] == "deploy":
+        policy = Policy.load("/tmp/gpc_cart_pole_policy.pkl")
+        test_interactive(task, policy)
