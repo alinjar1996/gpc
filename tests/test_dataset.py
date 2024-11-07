@@ -6,7 +6,7 @@ from hydrax.algs import PredictiveSampling
 from hydrax.tasks.particle import Particle
 from mujoco import mjx
 
-from gpc.data import TrainingData, collect_data, visualize_data
+from gpc.dataset import TrainingData, collect_data, visualize_data
 
 
 def test_collect_data() -> None:

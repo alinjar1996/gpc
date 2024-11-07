@@ -1,10 +1,12 @@
+import time
+
 import jax
 from hydrax.algs import PredictiveSampling
 from hydrax.tasks.particle import Particle
 from mujoco import mjx
 
-from gpc.data import TrainingData, collect_data, visualize_data
-from gpc.test import test_interactive
+from gpc.dataset import TrainingData, collect_data, visualize_data
+from gpc.testing import test_interactive
 from gpc.training import Policy, train
 
 
@@ -22,20 +24,26 @@ def gather_dataset(
     fname: str = "/tmp/gpc_particle_data.pkl", visualize: bool = True
 ) -> None:
     """Gather a dataset for training the GPC policy."""
+    print("Collecting data...")
     rng = jax.random.key(0)
     num_timesteps = 100
-    num_resets = 8
+    num_resets = 32
 
     task = Particle()
     ctrl = PredictiveSampling(task, num_samples=8, noise_level=0.5)
 
+    st = time.time()
     rng, reset_rng = jax.random.split(rng)
     dataset = collect_data(
         task, ctrl, num_timesteps, num_resets, reset_fn, reset_rng
     )
+    elapsed = time.time() - st
+
+    N = num_resets * num_timesteps
+    print(f"  Collected {N} data points in {elapsed:.2f}s")
 
     dataset.save(fname)
-    print(f"Dataset saved to {fname}")
+    print(f"  Dataset saved to {fname}")
 
     if visualize:
         visualize_data(task, dataset)
@@ -46,15 +54,17 @@ def train_policy(
     policy_fname: str = "/tmp/gpc_particle_policy.pkl",
 ) -> None:
     """Train a GPC policy and save it to a file."""
+    print("Training policy...")
     task = Particle()
     dataset = TrainingData.load(dataset_fname)
     policy = train(dataset, task)
     policy.save(policy_fname)
-    print(f"Policy saved to {policy_fname}")
+    print(f"  Policy saved to {policy_fname}")
 
 
 def test(policy_fname: str = "/tmp/gpc_particle_policy.pkl") -> None:
     """Test the trained policy interactively."""
+    print("Testing policy...")
     task = Particle()
     policy = Policy.load(policy_fname)
     test_interactive(task, policy)
@@ -65,7 +75,7 @@ if __name__ == "__main__":
     gather_dataset(visualize=True)
 
     # Train a GPC policy on the dataset and save the policy.
-    # train_policy()
+    train_policy()
 
     # Load the saved policy and test with an interactive simulation.
-    # test()
+    test()

@@ -10,7 +10,7 @@ import optax
 from hydrax.task_base import Task
 
 from gpc.architectures import ScoreMLP
-from gpc.data import TrainingData
+from gpc.dataset import TrainingData
 
 Params = Any
 
@@ -167,7 +167,7 @@ def train(data: TrainingData, task: Task) -> Policy:
             )
 
         # TODO: more systematic logging
-        print(f"Epoch {e+1}/{epochs}, loss: {loss}, time: {time.time() - st}")
+        print(f"  epoch {e+1}/{epochs}, loss: {loss}, time: {time.time() - st}")
 
     # Construct the policy
     return Policy(net, params, task.u_min, task.u_max)

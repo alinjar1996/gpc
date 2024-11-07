@@ -155,7 +155,7 @@ def visualize_data(
     with mujoco.viewer.launch_passive(mj_model, mj_data) as viewer:
         i = 0
         while viewer.is_running():
-            print(f"  {i+1}/{num_resets}...", end="\r")
+            print(f"  visualizing trajectory {i+1}/{num_resets}...", end="\r")
             for t in range(num_timesteps):
                 st = time.time()
 

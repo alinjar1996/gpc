@@ -5,7 +5,7 @@ import jax.numpy as jnp
 from hydrax.tasks.particle import Particle
 
 from gpc.architectures import ScoreMLP
-from gpc.data import TrainingData
+from gpc.dataset import TrainingData
 from gpc.training import Policy, train
 
 
