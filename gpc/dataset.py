@@ -174,3 +174,6 @@ def visualize_data(
             i += 1
             if i == num_resets:
                 i = 0
+
+    # Save what was last in the print buffer
+    print("")

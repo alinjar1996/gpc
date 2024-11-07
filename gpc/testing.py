@@ -68,3 +68,6 @@ def test_interactive(task: Task, policy: Policy) -> None:
             elapsed = time.time() - st
             if elapsed < mj_model.opt.timestep:
                 time.sleep(mj_model.opt.timestep - elapsed)
+
+    # Save what was last in the print buffer
+    print("")

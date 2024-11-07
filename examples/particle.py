@@ -76,10 +76,10 @@ def test(policy_fname: str = "/tmp/gpc_particle_policy.pkl") -> None:
 
 if __name__ == "__main__":
     # Run predictive sampling and save out the dataset.
-    # gather_dataset(visualize=True)
+    gather_dataset(visualize=True)
 
     # Train a GPC policy on the dataset and save the policy.
-    # train_policy()
+    train_policy()
 
     # Load the saved policy and test with an interactive simulation.
     test()
