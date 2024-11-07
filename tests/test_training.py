@@ -2,9 +2,11 @@ from pathlib import Path
 
 import jax
 import jax.numpy as jnp
+from hydrax.tasks.particle import Particle
 
 from gpc.architectures import ScoreMLP
-from gpc.training import Policy
+from gpc.data import TrainingData
+from gpc.training import Policy, train
 
 
 def test_policy() -> None:
@@ -53,5 +55,32 @@ def test_policy() -> None:
     local_dir.rmdir()
 
 
+def test_train() -> None:
+    """Test the training loop with toy data."""
+    rng = jax.random.key(0)
+    task = Particle()
+
+    # Make some toy data
+    rng, obs_rng, act_rng = jax.random.split(rng, 3)
+    dataset = TrainingData(
+        old_action_sequence=jax.random.uniform(act_rng, (128, 5, 2)),
+        new_action_sequence=jnp.zeros((128, 5, 2)),
+        observation=jax.random.uniform(obs_rng, (128, 4)),
+        state=None,
+    )
+
+    # Train the policy
+    policy = train(dataset, task)
+    assert isinstance(policy, Policy)
+
+    # Run the policy for a step
+    u_old = jnp.ones((5, 2))
+    y = jnp.zeros((4,))
+    u_new = policy.apply(u_old, y)
+
+    assert jnp.linalg.norm(u_new) < jnp.linalg.norm(u_old)
+
+
 if __name__ == "__main__":
     test_policy()
+    test_train()
