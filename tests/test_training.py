@@ -4,7 +4,7 @@ import jax
 import jax.numpy as jnp
 from hydrax.tasks.particle import Particle
 
-from gpc.architectures import ScoreMLP
+from gpc.architectures import ActionSequenceMLP
 from gpc.dataset import TrainingData
 from gpc.training import Policy, train
 
@@ -18,10 +18,8 @@ def test_policy() -> None:
 
     # Create a toy score MLP
     rng, init_rng = jax.random.split(rng)
-    mlp = ScoreMLP([64, 64])
-    params = mlp.init(
-        init_rng, jnp.zeros((num_steps, num_actions)), jnp.zeros((num_obs,))
-    )
+    mlp = ActionSequenceMLP([64, 64], num_steps, num_actions)
+    params = mlp.init(init_rng, jnp.zeros(num_obs))
 
     # Create the policy
     u_min = -2 * jnp.ones(num_actions)
@@ -29,13 +27,9 @@ def test_policy() -> None:
     policy = Policy(mlp, params, u_min, u_max)
 
     # Test running the policy
-    u_old = jnp.ones((num_steps, num_actions))
     y = jnp.ones((num_obs,))
-    u_new = policy.apply(u_old, y)
-
-    # Check that the output is in the correct range
-    assert jnp.all(u_new >= u_min)
-    assert jnp.all(u_new <= u_max)
+    u = policy.apply(y)
+    assert u.shape == (num_steps, num_actions)
 
     # Save and load the policy
     local_dir = Path("_test_policy")
@@ -46,8 +40,8 @@ def test_policy() -> None:
 
     policy = Policy.load(local_dir / "policy.pkl")
 
-    u_new_2 = policy.apply(u_old, y)
-    assert jnp.allclose(u_new, u_new_2)
+    u2 = policy.apply(y)
+    assert jnp.allclose(u2, u)
 
     # Cleanup
     for p in local_dir.iterdir():
@@ -70,16 +64,14 @@ def test_train() -> None:
     )
 
     # Train the policy
-    net = ScoreMLP([64, 64])
+    net = ActionSequenceMLP([64, 64], 5, 2)
     policy = train(dataset, task, net)
     assert isinstance(policy, Policy)
 
     # Run the policy for a step
-    u_old = jnp.ones((5, 2))
     y = jnp.zeros((4,))
-    u_new = policy.apply(u_old, y)
-
-    assert jnp.linalg.norm(u_new) < jnp.linalg.norm(u_old)
+    u = policy.apply(y)
+    assert u.shape == (5, 2)
 
 
 if __name__ == "__main__":
