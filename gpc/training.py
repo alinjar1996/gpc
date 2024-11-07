@@ -9,7 +9,6 @@ import jax.numpy as jnp
 import optax
 from hydrax.task_base import Task
 
-from gpc.architectures import ScoreMLP
 from gpc.dataset import TrainingData
 
 Params = Any
@@ -71,12 +70,17 @@ class Policy:
         return jax.numpy.clip(u_new, self.u_min, self.u_max)
 
 
-def train(data: TrainingData, task: Task) -> Policy:
+def train(
+    data: TrainingData,
+    task: Task,
+    net: nn.Module,
+) -> Policy:
     """Train a GPC policy based on the given training data.
 
     Args:
         data: The training data to use.
         task: The task to train the policy for.
+        net: Network architecture, U_new = NNet(U_old, y).
 
     Returns:
         The trained policy.
@@ -99,9 +103,7 @@ def train(data: TrainingData, task: Task) -> Policy:
     assert obs.shape[0] == num_data_points
 
     # Initialize the model
-    # TODO: take hyperparameters (or maybe the full net) as arguments
     rng, init_rng = jax.random.split(rng)
-    net = ScoreMLP([64, 64])
     params = net.init(init_rng, old_actions[0], obs[0])
 
     # Set up the optimizer

@@ -5,6 +5,7 @@ from hydrax.algs import PredictiveSampling
 from hydrax.tasks.particle import Particle
 from mujoco import mjx
 
+from gpc.architectures import ScoreMLP
 from gpc.dataset import TrainingData, collect_data, visualize_data
 from gpc.testing import test_interactive
 from gpc.training import Policy, train
@@ -57,7 +58,10 @@ def train_policy(
     print("Training policy...")
     task = Particle()
     dataset = TrainingData.load(dataset_fname)
-    policy = train(dataset, task)
+    net = ScoreMLP([64, 64])
+
+    policy = train(dataset, task, net)
+
     policy.save(policy_fname)
     print(f"  Policy saved to {policy_fname}")
 
@@ -72,7 +76,7 @@ def test(policy_fname: str = "/tmp/gpc_particle_policy.pkl") -> None:
 
 if __name__ == "__main__":
     # Run predictive sampling and save out the dataset.
-    gather_dataset(visualize=True)
+    # gather_dataset(visualize=True)
 
     # Train a GPC policy on the dataset and save the policy.
     train_policy()

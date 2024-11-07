@@ -70,7 +70,8 @@ def test_train() -> None:
     )
 
     # Train the policy
-    policy = train(dataset, task)
+    net = ScoreMLP([64, 64])
+    policy = train(dataset, task, net)
     assert isinstance(policy, Policy)
 
     # Run the policy for a step
