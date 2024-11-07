@@ -102,7 +102,7 @@ def train(
 
     # Reshape the data to flatten across initial states
     # TODO: shuffle and train-test split
-    old_actions = data.old_action_sequence.reshape(-1, horizon, act_dim)
+    old_actions = 0.0 * data.old_action_sequence.reshape(-1, horizon, act_dim)
     new_actions = data.new_action_sequence.reshape(-1, horizon, act_dim)
     obs = data.observation.reshape(-1, obs_dim)
 

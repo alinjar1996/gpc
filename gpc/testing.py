@@ -51,7 +51,7 @@ def test_interactive(task: Task, policy: Policy) -> None:
 
             # Update the action sequence
             inference_start = time.time()
-            actions = jit_policy(actions, obs)
+            actions = jit_policy(0.0 * actions, obs)
             mj_data.ctrl[:] = actions[0]
 
             obs_time = inference_start - st

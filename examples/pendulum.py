@@ -71,6 +71,6 @@ def test(policy_fname: str = "/tmp/gpc_pendulum_policy.pkl") -> None:
 
 
 if __name__ == "__main__":
-    gather_dataset()
+    # gather_dataset()
     train_policy()
     test()
