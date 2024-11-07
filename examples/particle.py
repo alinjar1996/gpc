@@ -5,7 +5,7 @@ from hydrax.algs import PredictiveSampling
 from hydrax.tasks.particle import Particle
 from mujoco import mjx
 
-from gpc.architectures import ScoreMLP
+from gpc.architectures import ActionSequenceMLP
 from gpc.dataset import TrainingData, collect_data, visualize_data
 from gpc.testing import test_interactive
 from gpc.training import Policy, train
@@ -58,7 +58,7 @@ def train_policy(
     print("Training policy...")
     task = Particle()
     dataset = TrainingData.load(dataset_fname)
-    net = ScoreMLP([64, 64])
+    net = ActionSequenceMLP([64, 64], task.planning_horizon, task.model.nu)
 
     policy = train(dataset, task, net)
 

@@ -25,7 +25,7 @@ def gather_dataset(
     """Gather a dataset for training the GPC policy."""
     print("Collecting data...")
     rng = jax.random.key(0)
-    num_timesteps = 400
+    num_timesteps = 100
     num_resets = 128
 
     task = Pendulum()
@@ -71,6 +71,6 @@ def test(policy_fname: str = "/tmp/gpc_pendulum_policy.pkl") -> None:
 
 
 if __name__ == "__main__":
-    # gather_dataset()
-    # train_policy()
+    gather_dataset()
+    train_policy()
     test()
