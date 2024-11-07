@@ -79,7 +79,7 @@ if __name__ == "__main__":
     # gather_dataset(visualize=True)
 
     # Train a GPC policy on the dataset and save the policy.
-    train_policy()
+    # train_policy()
 
     # Load the saved policy and test with an interactive simulation.
     test()

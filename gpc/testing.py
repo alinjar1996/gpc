@@ -5,6 +5,7 @@ import jax.numpy as jnp
 import mujoco
 import mujoco.viewer
 from hydrax.task_base import Task
+from mujoco import mjx
 
 from gpc.training import Policy
 
@@ -23,20 +24,43 @@ def test_interactive(task: Task, policy: Policy) -> None:
     mj_data = mujoco.MjData(mj_model)
 
     # Initialize the action sequence
-    # TODO: read size from task
-    actions = jnp.zeros((5, 2))
+    actions = jnp.zeros((task.planning_horizon, task.model.nu))
+
+    # Set up an observation function
+    mjx_data = mjx.make_data(task.model)
+
+    @jax.jit
+    def get_obs(mjx_data: mjx.Data) -> jax.Array:
+        """Get an observation from the mujoco data."""
+        mjx_data = mjx.forward(task.model, mjx_data)  # update sites & sensors
+        return task.get_obs(mjx_data)
 
     # Run the simulation
     with mujoco.viewer.launch_passive(mj_model, mj_data) as viewer:
         while viewer.is_running():
             st = time.time()
 
-            # TODO: get observation from the task
-            pos = mj_data.qpos[:2] - mj_data.mocap_pos[0, :2]
-            obs = jnp.array([pos, mj_data.qvel]).flatten()
+            # Get an observation
+            mjx_data = mjx_data.replace(
+                qpos=jnp.array(mj_data.qpos),
+                qvel=jnp.array(mj_data.qvel),
+                mocap_pos=jnp.array(mj_data.mocap_pos),
+                mocap_quat=jnp.array(mj_data.mocap_quat),
+            )
+            obs = get_obs(mjx_data)
 
+            # Update the action sequence
+            inference_start = time.time()
             actions = jit_policy(actions, obs)
             mj_data.ctrl[:] = actions[0]
+
+            obs_time = inference_start - st
+            inference_time = time.time() - inference_start
+            print(
+                f"  Observation time: {obs_time:.5f}s "
+                f" Inference time: {inference_time:.5f}s",
+                end="\r",
+            )
 
             mujoco.mj_step(mj_model, mj_data)
             viewer.sync()
