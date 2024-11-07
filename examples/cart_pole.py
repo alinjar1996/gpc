@@ -24,12 +24,6 @@ def reset_fn(mjx_data: mjx.Data, rng: jax.Array) -> mjx.Data:
 
 
 if __name__ == "__main__":
-    usage_msg = f"Usage: python {sys.argv[0]} [generate|fit|deploy]"
-
-    if len(sys.argv) < 2:
-        print(usage_msg)
-        sys.exit(1)
-
     # Set parameters
     task = CartPole()
     ctrl = PredictiveSampling(task, num_samples=128, noise_level=0.3)
@@ -37,7 +31,14 @@ if __name__ == "__main__":
     num_resets = 128
     hidden_layers = [64, 64]
 
-    if sys.argv[1] == "generate":
+    # Choose what to do based on command-line arguments
+    generate, fit, deploy = True, True, True
+    if len(sys.argv) == 2:
+        generate = sys.argv[1] == "generate"
+        fit = sys.argv[1] == "fit"
+        deploy = sys.argv[1] == "deploy"
+
+    if generate:
         generate_dataset_and_save(
             task,
             ctrl,
@@ -46,13 +47,13 @@ if __name__ == "__main__":
             num_resets,
             fname="/tmp/gpc_cart_pole_data.pkl",
         )
-    elif sys.argv[1] == "fit":
+    if fit:
         train_policy_and_save(
             task,
             dataset_fname="/tmp/gpc_cart_pole_data.pkl",
             policy_fname="/tmp/gpc_cart_pole_policy.pkl",
             hidden_layers=hidden_layers,
         )
-    elif sys.argv[1] == "deploy":
+    if deploy:
         policy = Policy.load("/tmp/gpc_cart_pole_policy.pkl")
         test_interactive(task, policy)

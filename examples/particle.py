@@ -1,14 +1,13 @@
-import time
+import sys
 
 import jax
 from hydrax.algs import PredictiveSampling
 from hydrax.tasks.particle import Particle
 from mujoco import mjx
 
-from gpc.architectures import ActionSequenceMLP
-from gpc.dataset import TrainingData, collect_data, visualize_data
 from gpc.testing import test_interactive
-from gpc.training import Policy, train
+from gpc.training import Policy
+from gpc.utils import generate_dataset_and_save, train_policy_and_save
 
 
 def reset_fn(mjx_data: mjx.Data, rng: jax.Array) -> mjx.Data:
@@ -21,65 +20,37 @@ def reset_fn(mjx_data: mjx.Data, rng: jax.Array) -> mjx.Data:
     return mjx_data.replace(qpos=qpos, qvel=qvel, mocap_pos=mocap_pos)
 
 
-def gather_dataset(
-    fname: str = "/tmp/gpc_particle_data.pkl", visualize: bool = True
-) -> None:
-    """Gather a dataset for training the GPC policy."""
-    print("Collecting data...")
-    rng = jax.random.key(0)
+if __name__ == "__main__":
+    # Set parameters
+    task = Particle()
+    ctrl = PredictiveSampling(task, num_samples=8, noise_level=0.1)
     num_timesteps = 100
     num_resets = 32
+    hidden_layers = [64, 64]
 
-    task = Particle()
-    ctrl = PredictiveSampling(task, num_samples=8, noise_level=0.5)
+    # Choose what to do based on command-line arguments
+    generate, fit, deploy = True, True, True
+    if len(sys.argv) == 2:
+        generate = sys.argv[1] == "generate"
+        fit = sys.argv[1] == "fit"
+        deploy = sys.argv[1] == "deploy"
 
-    st = time.time()
-    rng, reset_rng = jax.random.split(rng)
-    dataset = collect_data(
-        task, ctrl, num_timesteps, num_resets, reset_fn, reset_rng
-    )
-    elapsed = time.time() - st
-
-    N = num_resets * num_timesteps
-    print(f"  Collected {N} data points in {elapsed:.2f}s")
-
-    dataset.save(fname)
-    print(f"  Dataset saved to {fname}")
-
-    if visualize:
-        visualize_data(task, dataset)
-
-
-def train_policy(
-    dataset_fname: str = "/tmp/gpc_particle_data.pkl",
-    policy_fname: str = "/tmp/gpc_particle_policy.pkl",
-) -> None:
-    """Train a GPC policy and save it to a file."""
-    print("Training policy...")
-    task = Particle()
-    dataset = TrainingData.load(dataset_fname)
-    net = ActionSequenceMLP([64, 64], task.planning_horizon, task.model.nu)
-
-    policy = train(dataset, task, net)
-
-    policy.save(policy_fname)
-    print(f"  Policy saved to {policy_fname}")
-
-
-def test(policy_fname: str = "/tmp/gpc_particle_policy.pkl") -> None:
-    """Test the trained policy interactively."""
-    print("Testing policy...")
-    task = Particle()
-    policy = Policy.load(policy_fname)
-    test_interactive(task, policy)
-
-
-if __name__ == "__main__":
-    # Run predictive sampling and save out the dataset.
-    gather_dataset(visualize=True)
-
-    # Train a GPC policy on the dataset and save the policy.
-    train_policy()
-
-    # Load the saved policy and test with an interactive simulation.
-    test()
+    if generate:
+        generate_dataset_and_save(
+            task,
+            ctrl,
+            reset_fn,
+            num_timesteps,
+            num_resets,
+            fname="/tmp/gpc_particle_data.pkl",
+        )
+    if fit:
+        train_policy_and_save(
+            task,
+            dataset_fname="/tmp/gpc_particle_data.pkl",
+            policy_fname="/tmp/gpc_particle_policy.pkl",
+            hidden_layers=hidden_layers,
+        )
+    if deploy:
+        policy = Policy.load("/tmp/gpc_particle_policy.pkl")
+        test_interactive(task, policy)
