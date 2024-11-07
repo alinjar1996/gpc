@@ -74,6 +74,10 @@ def train(
     data: TrainingData,
     task: Task,
     net: nn.Module,
+    batch_size: int = 128,
+    epochs: int = 100,
+    learning_rate: float = 1e-3,
+    print_every: int = 10,
 ) -> Policy:
     """Train a GPC policy based on the given training data.
 
@@ -81,6 +85,10 @@ def train(
         data: The training data to use.
         task: The task to train the policy for.
         net: Network architecture, U_new = NNet(U_old, y).
+        batch_size: The number of data points in each batch.
+        epochs: The number of epochs (passes over the whole dataset).
+        learning_rate: The learning rate for the Adam optimizer.
+        print_every: The number of epochs between printing progress data.
 
     Returns:
         The trained policy.
@@ -107,7 +115,7 @@ def train(
     params = net.init(init_rng, old_actions[0], obs[0])
 
     # Set up the optimizer
-    optimizer = optax.adam(1e-3)
+    optimizer = optax.adam(learning_rate)
     opt_state = optimizer.init(params)
 
     # Define loss and parameter update functions
@@ -122,10 +130,6 @@ def train(
         return jnp.mean((pred - new_actions) ** 2)
 
     loss_and_grad = jax.value_and_grad(loss_fn)
-
-    # Set up the optimizer
-    optimizer = optax.adam(1e-3)
-    opt_state = optimizer.init(params)
 
     @jax.jit
     def update_fn(
@@ -142,11 +146,7 @@ def train(
         return params, opt_state, loss
 
     # Train the model
-    # TODO: set hyperparameters as arguments
-    batch_size = 128
     num_batches = num_data_points // batch_size
-    epochs = 100
-
     st = time.time()
     for e in range(epochs):
         for _ in range(num_batches):
@@ -169,7 +169,11 @@ def train(
             )
 
         # TODO: more systematic logging
-        print(f"  epoch {e+1}/{epochs}, loss: {loss}, time: {time.time() - st}")
+        if (e + 1) % print_every == 0:
+            print(
+                f"  epoch {e+1}/{epochs}, loss: {loss:.5f}, "
+                f"time: {time.time() - st:.2f} s"
+            )
 
     # Construct the policy
     return Policy(net, params, task.u_min, task.u_max)
