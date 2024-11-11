@@ -32,8 +32,8 @@ def simulate_episode(
     Returns:
         y: The observations at each time step.
         U: The optimal actions at each time step.
-        best_cost: cost of the best actions at each time step.
-        pred_cost: cost of the policy network's actions at each time step.
+        J_best: cost of the best actions at each time step.
+        J_pred: cost of the policy network's actions at each time step.
     """
     rng, ctrl_rng, env_rng = jax.random.split(rng, 3)
 
@@ -69,11 +69,11 @@ def simulate_episode(
 
         return (x, psi), (y, U_star, best_cost, pred_cost)
 
-    _, (y, U, best_costs, pred_costs) = jax.lax.scan(
+    _, (y, U, J_best, J_pred) = jax.lax.scan(
         _scan_fn, (x, psi), jnp.arange(env.episode_length)
     )
 
-    return y, U, best_costs, pred_costs
+    return y, U, J_best, J_pred
 
 
 def fit_policy(
@@ -154,53 +154,106 @@ def fit_policy(
     return params, opt_state, losses[-1]
 
 
-def train(env: TrainingEnv, ctrl: SamplingBasedController) -> None:
+def train(
+    env: TrainingEnv,
+    ctrl: SamplingBasedController,
+    net: ActionSequenceMLP,
+    num_envs: int,
+    learning_rate: float = 1e-3,
+    batch_size: int = 128,
+    num_epochs: int = 10,
+) -> None:
     """Train a generative predictive controller.
 
     Args:
         env: The training environment.
-        ctrl: The controller to train.
+        ctrl: The sampling-based predictive control method to use.
+        net: The policy network architecture, maps observation to control tape.
+        num_envs: The number of parallel environments to simulate.
+        learning_rate: The learning rate for the policy network.
+        batch_size: The batch size for training the policy network.
+        num_epochs: The number of epochs to train the policy network.
+
+    Note that the total number of parallel simulations is
+        `num_envs * ctrl.num_samples * ctrl.num_randomizations`
+
     """
     rng = jax.random.key(0)
 
-    # Set up a sampling-based controller that replaces one of the samples with
-    # a control tape prediction from a learned policy.
+    # Set up the sampling-based controller and policy network
     ctrl = PredictionAugmentedController(ctrl)
     assert env.task == ctrl.task
 
-    # Set up the policy network that generates action sequences
-    # TODO: make the network architecture an argument
-    net = ActionSequenceMLP(
-        hidden_layers=(32, 32),
-        num_steps=env.task.planning_horizon,
-        action_dim=env.task.model.nu,
-    )
+    # Set up the policy network
     rng, init_rng = jax.random.split(rng)
     params = net.init(init_rng, jnp.zeros(env.observation_size))
+    U_test = net.apply(params, jnp.zeros(env.observation_size))
+    assert U_test.shape == (env.task.planning_horizon, env.task.model.nu)
 
     # Initialize the optimizer
-    optimizer = optax.adam(1e-3)  # TODO: set the learning rate as an argument
+    optimizer = optax.adam(learning_rate)
     opt_state = optimizer.init(params)
+
+    # Set up some helper functions
+    @jax.jit
+    def jit_simulate(
+        params: Params, rng: jax.Array
+    ) -> Tuple[jax.Array, jax.Array, jax.Array, jax.Array]:
+        """Simulate episodes in parallel.
+
+        Args:
+            params: The policy network parameters.
+            rng: The random number generator key.
+
+        Returns:
+            y: The observations at each time step.
+            U: The optimal actions at each time step.
+            Average cost of the best action sequence.
+            Average cost of the policy's predicted action sequence.
+        """
+        rngs = jax.random.split(rng, num_envs)
+
+        y, U, J_best, J_pred = jax.vmap(
+            simulate_episode, in_axes=(None, None, None, None, 0)
+        )(env, ctrl, net, params, rngs)
+        return y, U, jnp.mean(J_best), jnp.mean(J_pred)
+
+    @jax.jit
+    def jit_fit(
+        observations: jax.Array,
+        actions: jax.Array,
+        params: Params,
+        opt_state: optax.OptState,
+        rng: jax.Array,
+    ) -> Tuple[Params, optax.OptState, jax.Array]:
+        """Fit the policy network to the data.
+
+        Args:
+            observations: The observations.
+            actions: The best action sequences.
+            params: The policy network parameters.
+            opt_state: The optimizer state.
+            rng: The random number generator key.
+
+        Returns:
+            The updated policy network parameters.
+            The updated optimizer state.
+            The loss from the last epoch.
+        """
+        y = observations.reshape(-1, observations.shape[-1])
+        U = actions.reshape(-1, env.task.planning_horizon, env.task.model.nu)
+        return fit_policy(
+            y, U, net, params, optimizer, opt_state, rng, batch_size, num_epochs
+        )
 
     # Gather data
     rng, episode_rng = jax.random.split(rng)
-    episode_rngs = jax.random.split(episode_rng, 10)
     st = time.time()
-    y, U, best, pred = jax.vmap(
-        simulate_episode, in_axes=(None, None, None, None, 0)
-    )(env, ctrl, net, params, episode_rngs)
-    print(y.shape, U.shape, best.shape, pred.shape)
+    y, U, J_best, J_pred = jit_simulate(params, episode_rng)
+    print(y.shape, U.shape, J_best, J_pred)
     print("Time taken:", time.time() - st)
 
-    # Flatten the dataset for training
-    y = y.reshape(-1, y.shape[-1])
-    U = U.reshape(-1, env.task.planning_horizon, env.task.model.nu)
-
-    # Fit the policy network
-    batch_size = 128
-    num_epochs = 10  # TODO: set as arguments
-    params, opt_state, loss = fit_policy(
-        y, U, net, params, optimizer, opt_state, rng, batch_size, num_epochs
-    )
+    rng, fit_rng = jax.random.split(rng)
+    params, opt_state, loss = jit_fit(y, U, params, opt_state, fit_rng)
 
     print("Final loss:", loss)

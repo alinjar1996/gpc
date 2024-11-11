@@ -71,10 +71,13 @@ def test_train() -> None:
     """Test the training loop."""
     env = ParticleEnv()
     ctrl = PredictiveSampling(env.task, num_samples=8, noise_level=0.1)
-    train(env, ctrl)
+    net = ActionSequenceMLP(
+        [32, 32], env.task.planning_horizon, env.task.model.nu
+    )
+    train(env, ctrl, net, num_envs=16)
 
 
 if __name__ == "__main__":
     # test_simulate()
-    test_fit()
-    # test_train()
+    # test_fit()
+    test_train()
