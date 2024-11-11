@@ -7,7 +7,7 @@ import optax
 from hydrax.alg_base import SamplingBasedController
 
 from gpc.architectures import ActionSequenceMLP
-from gpc.augmented_controller import PACParams, PredictionAugmentedController
+from gpc.augmented import PACParams, PredictionAugmentedController
 from gpc.env import SimulatorState, TrainingEnv
 
 Params = Any

@@ -4,7 +4,7 @@ from hydrax.algs import PredictiveSampling
 from hydrax.tasks.particle import Particle
 from mujoco import mjx
 
-from gpc.augmented_controller import PredictionAugmentedController
+from gpc.augmented import PredictionAugmentedController
 
 
 def test_augmented() -> None:
