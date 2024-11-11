@@ -76,6 +76,78 @@ def simulate_episode(
     return y, U, best_costs, pred_costs
 
 
+def fit_policy(
+    observations: jax.Array,
+    action_sequences: jax.Array,
+    net: ActionSequenceMLP,
+    params: Params,
+    optimizer: optax.GradientTransformation,
+    opt_state: optax.OptState,
+    rng: jax.Array,
+    batch_size: int,
+    num_epochs: int,
+) -> Tuple[Params, optax.OptState]:
+    """Fit the policy network U = NNet(y) to the given data.
+
+    Args:
+        observations: The observations y.
+        action_sequences: The corresponding target action sequences U.
+        net: The policy network.
+        params: The policy network parameters.
+        optimizer: The optimizer (e.g. Adam).
+        opt_state: The optimizer state.
+        rng: The random number generator key for shuffling the data.
+        batch_size: The batch size.
+        num_epochs: The number of epochs.
+
+    Returns:
+        The updated policy network parameters.
+        The updated optimizer state.
+        The loss from the last epoch.
+    """
+    num_data_points = observations.shape[0]
+    num_batches = max(1, num_data_points // batch_size)
+
+    def _loss_fn(params: Params, obs: jax.Array, act: jax.Array) -> jax.Array:
+        """Compute the regression loss for the policy network."""
+        pred = net.apply(params, obs)
+        return jnp.mean(jnp.square(act - pred))
+
+    def _sgd_step(
+        params: Params,
+        opt_state: optax.OptState,
+        obs: jax.Array,
+        act: jax.Array,
+    ) -> Tuple[Params, optax.OptState, jax.Array]:
+        """Perform a gradient descent step on the given batch of data."""
+        loss, grad = jax.value_and_grad(_loss_fn)(params, obs, act)
+        updates, opt_state = optimizer.update(grad, opt_state)
+        params = optax.apply_updates(params, updates)
+        return params, opt_state, loss
+
+    for _ in range(num_epochs):
+        for _ in range(num_batches):
+            # Get a random batch of data
+            rng, batch_rng = jax.random.split(rng)
+            batch_idx = jax.random.randint(
+                batch_rng, (batch_size,), 0, num_data_points
+            )
+            batch_obs = observations[batch_idx]
+            batch_act = action_sequences[batch_idx]
+
+            # Do an optimizer step
+            params, opt_state, loss = _sgd_step(
+                params,
+                opt_state,
+                batch_obs,
+                batch_act,
+            )
+
+        print(f"  loss: {loss:.5f}")
+
+    return params, opt_state, loss
+
+
 def train(env: TrainingEnv, ctrl: SamplingBasedController) -> None:
     """Train a generative predictive controller.
 
@@ -104,25 +176,6 @@ def train(env: TrainingEnv, ctrl: SamplingBasedController) -> None:
     optimizer = optax.adam(1e-3)  # TODO: set the learning rate as an argument
     opt_state = optimizer.init(params)
 
-    def _loss_fn(params: Params, obs: jax.Array, act: jax.Array) -> jax.Array:
-        """Compute the regression loss for the policy network."""
-        pred = net.apply(params, obs)
-        return jnp.mean(jnp.square(act - pred))
-
-    loss_and_grad = jax.value_and_grad(_loss_fn)
-
-    def _sgd_step(
-        params: Params,
-        opt_state: optax.OptState,
-        obs: jax.Array,
-        act: jax.Array,
-    ) -> Tuple[Params, optax.OptState, jax.Array]:
-        """Perform a gradient descent step on the given batch of data."""
-        loss, grad = loss_and_grad(params, obs, act)
-        updates, opt_state = optimizer.update(grad, opt_state)
-        params = optax.apply_updates(params, updates)
-        return params, opt_state, loss
-
     # Gather data
     rng, episode_rng = jax.random.split(rng)
     episode_rngs = jax.random.split(episode_rng, 10)
@@ -133,43 +186,15 @@ def train(env: TrainingEnv, ctrl: SamplingBasedController) -> None:
     print(y.shape, U.shape, best.shape, pred.shape)
     print("Time taken:", time.time() - st)
 
-    # rng, y_rng, U_rng = jax.random.split(rng, 3)
-    # y = jax.random.normal(y_rng, (10, env.episode_length, 4))  # fake data
-    # U = 0.1 * jax.random.normal(U_rng, (10, env.episode_length, 5, 2))
-
     # Flatten the dataset for training
     y = y.reshape(-1, y.shape[-1])
     U = U.reshape(-1, env.task.planning_horizon, env.task.model.nu)
-    print(y.shape)
-    print(U.shape)
 
     # Fit the policy network
-    num_epochs = 10  # TODO: set as arguments
     batch_size = 128
-    num_data_points = y.shape[0]
-    num_batches = max(1, num_data_points // batch_size)
+    num_epochs = 10  # TODO: set as arguments
+    params, opt_state, loss = fit_policy(
+        y, U, net, params, optimizer, opt_state, rng, batch_size, num_epochs
+    )
 
-    st = time.time()
-    for e in range(num_epochs):
-        for _ in range(num_batches):
-            # Get a random batch of data
-            rng, batch_rng = jax.random.split(rng)
-            batch_idx = jax.random.randint(
-                batch_rng, (batch_size,), 0, num_data_points
-            )
-            batch_obs = y[batch_idx]
-            batch_act = U[batch_idx]
-
-            # Do an optimizer step
-            params, opt_state, loss = _sgd_step(
-                params,
-                opt_state,
-                batch_obs,
-                batch_act,
-            )
-
-        # TODO: more systematic logging
-        print(
-            f"  epoch {e+1}/{num_epochs}, loss: {loss:.5f}, "
-            f"time: {time.time() - st:.2f} s"
-        )
+    print("Final loss:", loss)
