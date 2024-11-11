@@ -3,7 +3,7 @@ import sys
 from hydrax.algs import PredictiveSampling
 
 from gpc.architectures import ActionSequenceMLP
-from gpc.particle import ParticleEnv
+from gpc.envs import ParticleEnv
 from gpc.policy import Policy
 from gpc.testing import test_interactive
 from gpc.training import train
@@ -37,6 +37,7 @@ if __name__ == "__main__":
 
     elif sys.argv[1] == "test":
         # Load the policy from a file and test it interactively
+        print(f"Loading policy from {save_file}")
         policy = Policy.load(save_file)
         test_interactive(env, policy)
 

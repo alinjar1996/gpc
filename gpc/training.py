@@ -10,7 +10,7 @@ from tensorboardX import SummaryWriter
 
 from gpc.architectures import ActionSequenceMLP
 from gpc.augmented import PACParams, PredictionAugmentedController
-from gpc.env import SimulatorState, TrainingEnv
+from gpc.envs import SimulatorState, TrainingEnv
 from gpc.policy import Policy
 
 Params = Any
@@ -276,12 +276,13 @@ def train(
         # TODO: run some evaluation tests
 
         # Print a performance summary
-        print(f"  Iteration {i+1}/{num_iters}")
-        print(f"    policy: {J_pred:.4f}")
-        print(f"    best: {J_best:.4f}")
-        print(f"    loss: {loss:.4f}")
-        print(f"    sim time: {sim_time:.4f}s")
-        print(f"    sit time: {fit_time:.4f}s")
+        print(
+            f"  {i+1}/{num_iters} |"
+            f" policy: {J_pred:.4f} |"
+            f" best: {J_best:.4f} |"
+            f" loss: {loss:.4f} |"
+            f" iter time: {sim_time + fit_time:.4f} s"
+        )
 
         # Tensorboard logging
         tb_writer.add_scalar("sim/policy_cost", J_pred, i)

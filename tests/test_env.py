@@ -1,7 +1,7 @@
 import jax
 import jax.numpy as jnp
 
-from gpc.particle import ParticleEnv
+from gpc.envs import ParticleEnv
 
 
 def test_particle_env() -> None:

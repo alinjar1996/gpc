@@ -9,7 +9,7 @@ from hydrax.algs import PredictiveSampling
 
 from gpc.architectures import ActionSequenceMLP
 from gpc.augmented import PredictionAugmentedController
-from gpc.particle import ParticleEnv
+from gpc.envs import ParticleEnv
 from gpc.policy import Policy
 from gpc.training import fit_policy, simulate_episode, train
 
