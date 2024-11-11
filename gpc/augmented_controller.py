@@ -62,5 +62,10 @@ class PredictionAugmentedController(SamplingBasedController):
         return params.replace(base_params=base_params)
 
     def get_action(self, params: PACParams, t: float) -> jax.Array:
-        """Get the action from the base controller."""
+        """Get the action from the base controller at a given time."""
         return self.base_ctrl.get_action(params.base_params, t)
+
+    def get_action_sequence(self, params: PACParams) -> jax.Array:
+        """Get the action sequence from the controller."""
+        timesteps = jnp.arange(self.task.planning_horizon) * self.task.dt
+        return jax.vmap(self.get_action, in_axes=(None, 0))(params, timesteps)

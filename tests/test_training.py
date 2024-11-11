@@ -8,7 +8,7 @@ def test_train() -> None:
     """Test the training loop."""
     env = ParticleEnv()
     ctrl = PredictiveSampling(env.task, num_samples=8, noise_level=0.1)
-    train(env, ctrl, visualize=True)
+    train(env, ctrl, visualize=False)
 
 
 if __name__ == "__main__":

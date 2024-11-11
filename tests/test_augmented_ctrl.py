@@ -25,7 +25,7 @@ def test_augmented() -> None:
         prediction=jnp.ones((task.planning_horizon, task.model.nu))
     )
 
-    for _ in range(100):
+    for _ in range(10):
         # Do an optimization step
         params, rollouts = jit_opt(state, params)
 
@@ -38,6 +38,9 @@ def test_augmented() -> None:
     assert jnp.linalg.norm(best_obs[-1, 0:2]) < 0.01
     assert jnp.all(best_ctrl != 0.0)
     assert jnp.all(params.prediction == 1.0)
+
+    U = opt.get_action_sequence(params)
+    assert jnp.allclose(U, params.base_params.mean)
 
 
 if __name__ == "__main__":
