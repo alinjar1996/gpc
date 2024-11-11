@@ -13,6 +13,69 @@ from gpc.env import SimulatorState, TrainingEnv
 Params = Any
 
 
+def simulate_episode(
+    env: TrainingEnv,
+    ctrl: PredictionAugmentedController,
+    net: ActionSequenceMLP,
+    params: Params,
+    rng: jax.Array,
+) -> Tuple[jax.Array, jax.Array, jax.Array, jax.Array]:
+    """Starting from a random initial state, run SPC and record training data.
+
+    Args:
+        env: The training environment.
+        ctrl: The sampling-based controller (augmented with a learned policy).
+        net: The policy network.
+        params: The policy network parameters.
+        rng: The random number generator key.
+
+    Returns:
+        y: The observations at each time step.
+        U: The optimal actions at each time step.
+        best_cost: cost of the best actions at each time step.
+        pred_cost: cost of the policy network's actions at each time step.
+    """
+    rng, ctrl_rng, env_rng = jax.random.split(rng, 3)
+
+    # Set the initial state of the environment
+    x = env.init_state(env_rng)
+
+    # Set the initial sampling-based controller parameters
+    psi = ctrl.init_params()
+    psi = psi.replace(base_params=psi.base_params.replace(rng=ctrl_rng))
+
+    def _scan_fn(carry: Tuple[SimulatorState, PACParams], t: int) -> Tuple:
+        """Take step in the training loop."""
+        x, psi = carry
+
+        # Generate an action sequence from the learned policy
+        y = env.get_observation(x)
+        U_pred = net.apply(params, y)
+
+        # Using the predicted action sequence as one of the samples, find an
+        # optimal action sequence
+        psi = psi.replace(prediction=U_pred)
+        psi, rollouts = ctrl.optimize(x.data, psi)
+        U_star = ctrl.get_action_sequence(psi)
+
+        # Record the cost of the predicted action sequence relative to the
+        # best sample.
+        costs = jnp.sum(rollouts.costs[0], axis=1)
+        best_cost = jnp.min(costs)
+        pred_cost = costs[-1]  # U_pred gets placed at the end of the samples
+
+        # Step the simulation
+        x = env.step(x, U_star[0])
+
+        return (x, psi), (y, U_star, best_cost, pred_cost)
+
+    _, (y, U, best_costs, pred_costs) = jax.lax.scan(
+        _scan_fn, (x, psi), jnp.arange(env.episode_length)
+    )
+
+    return y, U, best_costs, pred_costs
+
+
 def train(env: TrainingEnv, ctrl: SamplingBasedController) -> None:
     """Train a generative predictive controller.
 
@@ -41,62 +104,6 @@ def train(env: TrainingEnv, ctrl: SamplingBasedController) -> None:
     optimizer = optax.adam(1e-3)  # TODO: set the learning rate as an argument
     opt_state = optimizer.init(params)
 
-    # Define some helper functions
-    def _scan_fn(carry: Tuple[SimulatorState, PACParams], t: int) -> Tuple:
-        """Take step in the training loop."""
-        x, psi = carry
-
-        # Generate an action sequence from the learned policy
-        y = env.get_observation(x)
-        U_pred = jnp.zeros((ctrl.task.planning_horizon, ctrl.task.model.nu))
-
-        # Using the predicted action sequence as one of the samples, find an
-        # optimal action sequence
-        psi = psi.replace(prediction=U_pred)
-        psi, rollouts = ctrl.optimize(x.data, psi)
-        U_star = ctrl.get_action_sequence(psi)
-
-        # Record the cost of the predicted action sequence relative to the
-        # best sample.
-        costs = jnp.sum(rollouts.costs[0], axis=1)
-        best_cost = jnp.min(costs)
-        pred_cost = costs[-1]  # U_pred gets placed at the end of the samples
-
-        # Step the simulation
-        x = env.step(x, U_star[0])
-
-        return (x, psi), (y, U_star, best_cost, pred_cost)
-
-    def _run_episode(
-        rng: jax.Array, params: Any
-    ) -> Tuple[jax.Array, jax.Array, jax.Array, jax.Array]:
-        """Simulate an episode and collect policy training data.
-
-        Args:
-            rng: The random number generator key.
-            params: The policy network parameters.
-
-        Returns:
-            Observations y.
-            Optimal actions U.
-            Average cost of the best sample.
-            Average cost of the policy's sample.
-        """
-        rng, ctrl_rng, env_rng = jax.random.split(rng, 3)
-
-        # Set the initial state of the environment
-        x = env.init_state(env_rng)
-
-        # Set the initial sampling-based controller parameters
-        psi = ctrl.init_params()
-        psi = psi.replace(base_params=psi.base_params.replace(rng=ctrl_rng))
-
-        _, (y, U, best_costs, pred_costs) = jax.lax.scan(
-            _scan_fn, (x, psi), jnp.arange(env.episode_length)
-        )
-
-        return y, U, jnp.mean(best_costs), jnp.mean(pred_costs)
-
     def _loss_fn(params: Params, obs: jax.Array, act: jax.Array) -> jax.Array:
         """Compute the regression loss for the policy network."""
         pred = net.apply(params, obs)
@@ -117,18 +124,18 @@ def train(env: TrainingEnv, ctrl: SamplingBasedController) -> None:
         return params, opt_state, loss
 
     # Gather data
-    # rng, episode_rng = jax.random.split(rng)
-    # episode_rngs = jax.random.split(episode_rng, 10)
-    # st = time.time()
-    # y, U, best, pred = jax.vmap(_run_episode, in_axes=(0, None))(
-    #     episode_rngs, None
-    # )
-    # print(y.shape, U.shape, best, pred)
-    # print(jnp.mean(best), jnp.mean(pred))
-    # print("Time taken:", time.time() - st)
-    rng, y_rng, U_rng = jax.random.split(rng, 3)
-    y = jax.random.normal(y_rng, (10, env.episode_length, 4))  # fake data
-    U = 0.1 * jax.random.normal(U_rng, (10, env.episode_length, 5, 2))
+    rng, episode_rng = jax.random.split(rng)
+    episode_rngs = jax.random.split(episode_rng, 10)
+    st = time.time()
+    y, U, best, pred = jax.vmap(
+        simulate_episode, in_axes=(None, None, None, None, 0)
+    )(env, ctrl, net, params, episode_rngs)
+    print(y.shape, U.shape, best.shape, pred.shape)
+    print("Time taken:", time.time() - st)
+
+    # rng, y_rng, U_rng = jax.random.split(rng, 3)
+    # y = jax.random.normal(y_rng, (10, env.episode_length, 4))  # fake data
+    # U = 0.1 * jax.random.normal(U_rng, (10, env.episode_length, 5, 2))
 
     # Flatten the dataset for training
     y = y.reshape(-1, y.shape[-1])
