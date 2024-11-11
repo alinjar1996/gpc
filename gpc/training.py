@@ -158,6 +158,7 @@ def train(
     env: TrainingEnv,
     ctrl: SamplingBasedController,
     net: ActionSequenceMLP,
+    num_iters: int,
     num_envs: int,
     learning_rate: float = 1e-3,
     batch_size: int = 128,
@@ -169,6 +170,7 @@ def train(
         env: The training environment.
         ctrl: The sampling-based predictive control method to use.
         net: The policy network architecture, maps observation to control tape.
+        num_iters: The number of training iterations.
         num_envs: The number of parallel environments to simulate.
         learning_rate: The learning rate for the policy network.
         batch_size: The batch size for training the policy network.
@@ -246,14 +248,28 @@ def train(
             y, U, net, params, optimizer, opt_state, rng, batch_size, num_epochs
         )
 
-    # Gather data
-    rng, episode_rng = jax.random.split(rng)
-    st = time.time()
-    y, U, J_best, J_pred = jit_simulate(params, episode_rng)
-    print(y.shape, U.shape, J_best, J_pred)
-    print("Time taken:", time.time() - st)
+    for i in range(num_iters):
+        # Simulate using SPC and record the best action sequences. One of the
+        # samples gets replaced with the policy output U = NNet(y).
+        sim_start = time.time()
+        rng, episode_rng = jax.random.split(rng)
+        y, U, J_best, J_pred = jit_simulate(params, episode_rng)
+        sim_time = time.time() - sim_start
 
-    rng, fit_rng = jax.random.split(rng)
-    params, opt_state, loss = jit_fit(y, U, params, opt_state, fit_rng)
+        # Fit the policy network U = NNet(y) to the data
+        fit_start = time.time()
+        rng, fit_rng = jax.random.split(rng)
+        params, opt_state, loss = jit_fit(y, U, params, opt_state, fit_rng)
+        fit_time = time.time() - fit_start
 
-    print("Final loss:", loss)
+        # TODO: run some evaluation tests
+
+        # Print a performance summary
+        print(f"  Iteration {i+1}/{num_iters}")
+        print(f"    policy: {J_pred:.4f}")
+        print(f"    best: {J_best:.4f}")
+        print(f"    loss: {loss:.4f}")
+        print(f"    sim time: {sim_time:.4f}s")
+        print(f"    sit time: {fit_time:.4f}s")
+
+        # TODO: tensorboard logging

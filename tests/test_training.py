@@ -74,7 +74,7 @@ def test_train() -> None:
     net = ActionSequenceMLP(
         [32, 32], env.task.planning_horizon, env.task.model.nu
     )
-    train(env, ctrl, net, num_envs=16)
+    train(env, ctrl, net, num_iters=10, num_envs=128)
 
 
 if __name__ == "__main__":
