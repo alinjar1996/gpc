@@ -51,10 +51,11 @@ def train_policy_and_save(
     dataset_fname: str,
     policy_fname: str,
     hidden_layers: Sequence[int],
+    **kwargs,
 ) -> None:
     """Load a dataset, train a policy, and save the policy to a file."""
     dataset = TrainingData.load(dataset_fname)
     net = ActionSequenceMLP(hidden_layers, task.planning_horizon, task.model.nu)
-    policy = train(dataset, task, net)
+    policy = train(dataset, task, net, **kwargs)
     policy.save(policy_fname)
     print(f"  Policy saved to {policy_fname}")
