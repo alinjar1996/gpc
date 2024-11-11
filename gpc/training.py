@@ -1,10 +1,12 @@
 import time
-from typing import Any, Tuple
+from pathlib import Path
+from typing import Any, Tuple, Union
 
 import jax
 import jax.numpy as jnp
 import optax
 from hydrax.alg_base import SamplingBasedController
+from tensorboardX import SummaryWriter
 
 from gpc.architectures import ActionSequenceMLP
 from gpc.augmented import PACParams, PredictionAugmentedController
@@ -159,6 +161,7 @@ def train(
     env: TrainingEnv,
     ctrl: SamplingBasedController,
     net: ActionSequenceMLP,
+    log_dir: Union[Path, str],
     num_iters: int,
     num_envs: int,
     learning_rate: float = 1e-3,
@@ -171,6 +174,7 @@ def train(
         env: The training environment.
         ctrl: The sampling-based predictive control method to use.
         net: The policy network architecture, maps observation to control tape.
+        log_dir: The directory to log TensorBoard data to.
         num_iters: The number of training iterations.
         num_envs: The number of parallel environments to simulate.
         learning_rate: The learning rate for the policy network.
@@ -196,6 +200,12 @@ def train(
     # Initialize the optimizer
     optimizer = optax.adam(learning_rate)
     opt_state = optimizer.init(params)
+
+    # Set up the TensorBoard logger
+    datetime = time.strftime("%Y%m%d_%H%M%S")
+    log_dir = Path(log_dir) / datetime
+    print("Logging to", log_dir)
+    tb_writer = SummaryWriter(log_dir)
 
     # Set up some helper functions
     @jax.jit
@@ -273,7 +283,13 @@ def train(
         print(f"    sim time: {sim_time:.4f}s")
         print(f"    sit time: {fit_time:.4f}s")
 
-        # TODO: tensorboard logging
+        # Tensorboard logging
+        tb_writer.add_scalar("sim/policy_cost", J_pred, i)
+        tb_writer.add_scalar("sim/best_cost", J_best, i)
+        tb_writer.add_scalar("sim/time", sim_time, i)
+        tb_writer.add_scalar("fit/loss", loss, i)
+        tb_writer.add_scalar("fit/time", fit_time, i)
+        tb_writer.flush()
 
     # Create a pickle-able policy object
     policy = Policy(net, params, env.task.u_min, env.task.u_max)

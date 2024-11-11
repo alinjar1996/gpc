@@ -1,3 +1,4 @@
+import shutil
 import time
 from pathlib import Path
 
@@ -71,12 +72,15 @@ def test_fit() -> None:
 
 def test_train() -> None:
     """Test the training loop."""
+    log_dir = Path("_test_train")
+    log_dir.mkdir(parents=True, exist_ok=True)
+
     env = ParticleEnv()
     ctrl = PredictiveSampling(env.task, num_samples=8, noise_level=0.1)
     net = ActionSequenceMLP(
         [32, 32], env.task.planning_horizon, env.task.model.nu
     )
-    policy = train(env, ctrl, net, num_iters=3, num_envs=128)
+    policy = train(env, ctrl, net, log_dir, num_iters=3, num_envs=128)
 
     assert isinstance(policy, Policy)
     y = jnp.array([-0.1, 0.1, 0.0, 0.0])
@@ -86,6 +90,9 @@ def test_train() -> None:
     assert U.shape == (env.task.planning_horizon, env.task.model.nu)
     assert U[0, 0] > 0.0
     assert U[0, 1] < 0.0
+
+    # Cleanup recursively
+    shutil.rmtree(log_dir)
 
 
 def test_policy() -> None:
@@ -129,7 +136,7 @@ def test_policy() -> None:
 
 
 if __name__ == "__main__":
-    test_simulate()
-    test_fit()
+    # test_simulate()
+    # test_fit()
     test_train()
-    test_policy()
+    # test_policy()

@@ -24,7 +24,14 @@ if __name__ == "__main__":
         net = ActionSequenceMLP(
             [32, 32], env.task.planning_horizon, env.task.model.nu
         )
-        policy = train(env, ctrl, net, num_iters=10, num_envs=128)
+        policy = train(
+            env,
+            ctrl,
+            net,
+            log_dir="/tmp/gpc_particle",
+            num_iters=10,
+            num_envs=128,
+        )
         policy.save(save_file)
         print(f"Saved policy to {save_file}")
 

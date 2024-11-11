@@ -25,6 +25,8 @@ dependencies = [
     "mujoco-mjx==3.2.4",
     "evosax==0.1.6",
     "optax==0.2.3",
+    "tensorboard==2.18.0",
+    "tensorboardX==2.6.2",
 ]
 
 [tool.ruff]
