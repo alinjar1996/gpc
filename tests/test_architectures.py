@@ -4,7 +4,7 @@ from pathlib import Path
 import jax
 import jax.numpy as jnp
 
-from gpc.architectures import MLP, ScoreMLP, print_module_summary
+from gpc.architectures import MLP, ActionSequenceMLP, print_module_summary
 
 
 def test_mlp_construction() -> None:
@@ -78,34 +78,27 @@ def test_mlp_save_load() -> None:
     local_dir.rmdir()
 
 
-def test_score_mlp() -> None:
-    """Test a simple MLP score network."""
+def test_action_sequence_mlp() -> None:
+    """Test the trajectory-generation MLP."""
+    num_steps = 5
+    action_dim = 3
+    net = ActionSequenceMLP(
+        hidden_layers=(32, 32), num_steps=num_steps, action_dim=action_dim
+    )
+
     rng = jax.random.key(0)
+    rng, init_rng = jax.random.split(rng)
+    dummy_input = jnp.ones(7)
+    params = net.init(init_rng, dummy_input)
 
-    # Network parameters
-    batch = 8
-    horizon = 5
-    num_actions = 2
-    num_obs = 3
+    U = net.apply(params, jnp.ones(7))
+    assert U.shape == (num_steps, action_dim)
 
-    # Dummy inputs
-    U = jnp.zeros((batch, horizon, num_actions))
-    y = jnp.zeros((batch, num_obs))
-
-    # Create the network
-    net = ScoreMLP([64, 64])
-    params = net.init(rng, U, y)
-
-    # Test the forward pass
-    s = net.apply(params, U, y)
-    assert s.shape == U.shape
-
-    # Try with just a single data point
-    s = net.apply(params, U[0], y[0])
-    assert s.shape == (horizon, num_actions)
+    U = net.apply(params, jnp.ones((14, 24, 7)))
+    assert U.shape == (14, 24, num_steps, action_dim)
 
 
 if __name__ == "__main__":
     test_mlp_construction()
     test_mlp_save_load()
-    test_score_mlp()
+    test_action_sequence_mlp()
