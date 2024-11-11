@@ -86,7 +86,7 @@ def fit_policy(
     rng: jax.Array,
     batch_size: int,
     num_epochs: int,
-) -> Tuple[Params, optax.OptState]:
+) -> Tuple[Params, optax.OptState, jax.Array]:
     """Fit the policy network U = NNet(y) to the given data.
 
     Args:
