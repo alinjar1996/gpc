@@ -40,6 +40,11 @@ class TrainingEnv(ABC):
     def reset(self, data: mjx.Data, rng: jax.Array) -> mjx.Data:
         """Reset the simulator to start a new episode."""
 
+    @property
+    @abstractmethod
+    def observation_size(self) -> int:
+        """The size of the observation space."""
+
     def _reset_state(self, state: SimulatorState) -> SimulatorState:
         """Reset the simulator state to start a new episode."""
         rng, reset_rng = jax.random.split(state.rng)

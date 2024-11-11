@@ -20,3 +20,8 @@ class ParticleEnv(TrainingEnv):
         target = jax.random.uniform(mocap_rng, (2,), minval=-0.29, maxval=0.29)
         mocap_pos = data.mocap_pos.at[0, 0:2].set(target)
         return data.replace(qpos=qpos, qvel=qvel, mocap_pos=mocap_pos)
+
+    @property
+    def observation_size(self) -> int:
+        """The size of the observation space."""
+        return 4
