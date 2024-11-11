@@ -41,7 +41,7 @@ def test_mlp_construction() -> None:
 
 def test_mlp_save_load() -> None:
     """Verify that we can pickle an MLP."""
-    rng = jax.random.PRNGKey(0)
+    rng = jax.random.key(0)
     mlp = MLP(layer_sizes=(2, 3, 4))
     dummy_input = jnp.ones((3,))
     params = mlp.init(rng, dummy_input)

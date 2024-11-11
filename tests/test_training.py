@@ -1,4 +1,5 @@
 import time
+from pathlib import Path
 
 import jax
 import jax.numpy as jnp
@@ -8,6 +9,7 @@ from hydrax.algs import PredictiveSampling
 from gpc.architectures import ActionSequenceMLP
 from gpc.augmented import PredictionAugmentedController
 from gpc.particle import ParticleEnv
+from gpc.policy import Policy
 from gpc.training import fit_policy, simulate_episode, train
 
 
@@ -74,10 +76,60 @@ def test_train() -> None:
     net = ActionSequenceMLP(
         [32, 32], env.task.planning_horizon, env.task.model.nu
     )
-    train(env, ctrl, net, num_iters=10, num_envs=128)
+    policy = train(env, ctrl, net, num_iters=3, num_envs=128)
+
+    assert isinstance(policy, Policy)
+    y = jnp.array([-0.1, 0.1, 0.0, 0.0])
+    U = policy.apply(y)
+
+    # Check that the policy output points in the right direction
+    assert U.shape == (env.task.planning_horizon, env.task.model.nu)
+    assert U[0, 0] > 0.0
+    assert U[0, 1] < 0.0
+
+
+def test_policy() -> None:
+    """Test the policy helper class."""
+    rng = jax.random.key(0)
+    num_steps = 5
+    num_actions = 2
+    num_obs = 3
+
+    # Create a toy network and parameters
+    rng, init_rng = jax.random.split(rng)
+    mlp = ActionSequenceMLP([64, 64], num_steps, num_actions)
+    params = mlp.init(init_rng, jnp.zeros(num_obs))
+
+    # Create the policy
+    u_min = -2 * jnp.ones(num_actions)
+    u_max = 0.1 * jnp.ones(num_actions)
+    policy = Policy(mlp, params, u_min, u_max)
+
+    # Test running the policy
+    y = jnp.ones((num_obs,))
+    u = policy.apply(y)
+    assert u.shape == (num_steps, num_actions)
+
+    # Save and load the policy
+    local_dir = Path("_test_policy")
+    local_dir.mkdir(parents=True, exist_ok=True)
+
+    policy.save(local_dir / "policy.pkl")
+    del policy
+
+    policy = Policy.load(local_dir / "policy.pkl")
+
+    u2 = policy.apply(y)
+    assert jnp.allclose(u2, u)
+
+    # Cleanup
+    for p in local_dir.iterdir():
+        p.unlink()
+    local_dir.rmdir()
 
 
 if __name__ == "__main__":
-    # test_simulate()
-    # test_fit()
+    test_simulate()
+    test_fit()
     test_train()
+    test_policy()

@@ -9,6 +9,7 @@ from hydrax.alg_base import SamplingBasedController
 from gpc.architectures import ActionSequenceMLP
 from gpc.augmented import PACParams, PredictionAugmentedController
 from gpc.env import SimulatorState, TrainingEnv
+from gpc.policy import Policy
 
 Params = Any
 
@@ -273,3 +274,7 @@ def train(
         print(f"    sit time: {fit_time:.4f}s")
 
         # TODO: tensorboard logging
+
+    # Create a pickle-able policy object
+    policy = Policy(net, params, env.task.u_min, env.task.u_max)
+    return policy
