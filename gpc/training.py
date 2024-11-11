@@ -1,42 +1,27 @@
 import time
+from typing import Any, Tuple
 
 import jax
 import jax.numpy as jnp
-import mujoco
-import mujoco.viewer
 from hydrax.alg_base import SamplingBasedController
 
-from gpc.augmented_controller import PredictionAugmentedController
-from gpc.env import TrainingEnv
+from gpc.augmented_controller import PACParams, PredictionAugmentedController
+from gpc.env import SimulatorState, TrainingEnv
 
 
-def train(
-    env: TrainingEnv, ctrl: SamplingBasedController, visualize: bool
-) -> None:
+def train(env: TrainingEnv, ctrl: SamplingBasedController) -> None:
     """Train a generative predictive controller.
 
     Args:
         env: The training environment.
         ctrl: The controller to train.
-        visualize: Flag for visualizing the training process.
     """
-    if visualize:
-        # Set up a visualization window
-        mj_model = env.task.mj_model
-        mj_data = mujoco.MjData(mj_model)
-        viewer = mujoco.viewer.launch_passive(mj_model, mj_data)
-
-    # Set up the controller
     ctrl = PredictionAugmentedController(ctrl)
-    psi = ctrl.init_params()
 
-    # Initialize the environment
-    rng = jax.random.key(0)
-    rng, init_rng = jax.random.split(rng)
-    x = env.init_state(init_rng)
+    def _scan_fn(carry: Tuple[SimulatorState, PACParams], t: int) -> Tuple:
+        """Take step in the training loop."""
+        x, psi = carry
 
-    # Training loop
-    for t in range(env.episode_length):
         # Generate an action sequence from the learned policy
         y = env.get_observation(x)
         U_pred = jnp.zeros((ctrl.task.planning_horizon, ctrl.task.model.nu))
@@ -56,9 +41,46 @@ def train(
         # Step the simulation
         x = env.step(x, U_star[0])
 
-        print(f"Step {t}: Best cost {best_cost}, Predicted cost {pred_cost}")
+        return (x, psi), (y, U_star, best_cost, pred_cost)
 
-    if visualize:
-        # Close the visualizer
-        time.sleep(1)
-        viewer.close()
+    @jax.jit
+    def _run_episode(
+        rng: jax.Array, params: Any
+    ) -> Tuple[jax.Array, jax.Array, jax.Array, jax.Array]:
+        """Simulate an episode and collect policy training data.
+
+        Args:
+            rng: The random number generator key.
+            params: The policy network parameters.
+
+        Returns:
+            Observations y.
+            Optimal actions U.
+            Average cost of the best sample.
+            Average cost of the policy's sample.
+        """
+        rng, ctrl_rng, env_rng = jax.random.split(rng, 3)
+
+        # Set the initial state of the environment
+        x = env.init_state(env_rng)
+
+        # Set the initial sampling-based controller parameters
+        psi = ctrl.init_params()
+        psi = psi.replace(base_params=psi.base_params.replace(rng=ctrl_rng))
+
+        _, (y, U, best_costs, pred_costs) = jax.lax.scan(
+            _scan_fn, (x, psi), jnp.arange(env.episode_length)
+        )
+
+        return y, U, jnp.mean(best_costs), jnp.mean(pred_costs)
+
+    rng = jax.random.key(0)
+    rng, episode_rng = jax.random.split(rng)
+    episode_rngs = jax.random.split(episode_rng, 10)
+
+    st = time.time()
+    y, U, best, pred = jax.vmap(_run_episode, in_axes=(0, None))(
+        episode_rngs, None
+    )
+    print(y.shape, U.shape, best, pred)
+    print("Time taken:", time.time() - st)
