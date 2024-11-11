@@ -125,27 +125,33 @@ def fit_policy(
         params = optax.apply_updates(params, updates)
         return params, opt_state, loss
 
-    for _ in range(num_epochs):
-        for _ in range(num_batches):
-            # Get a random batch of data
-            rng, batch_rng = jax.random.split(rng)
-            batch_idx = jax.random.randint(
-                batch_rng, (batch_size,), 0, num_data_points
-            )
-            batch_obs = observations[batch_idx]
-            batch_act = action_sequences[batch_idx]
+    def _scan(carry: Tuple[Params, optax.OptState, jax.Array], t: int) -> Tuple:
+        """Inner loop function for the optimizer."""
+        params, opt_state, rng = carry
 
-            # Do an optimizer step
-            params, opt_state, loss = _sgd_step(
-                params,
-                opt_state,
-                batch_obs,
-                batch_act,
-            )
+        # Get a random batch of data
+        rng, batch_rng = jax.random.split(rng)
+        batch_idx = jax.random.randint(
+            batch_rng, (batch_size,), 0, num_data_points
+        )
+        batch_obs = observations[batch_idx]
+        batch_act = action_sequences[batch_idx]
 
-        print(f"  loss: {loss:.5f}")
+        # Do an optimizer step
+        params, opt_state, loss = _sgd_step(
+            params,
+            opt_state,
+            batch_obs,
+            batch_act,
+        )
 
-    return params, opt_state, loss
+        return (params, opt_state, rng), loss
+
+    (params, opt_state, rng), losses = jax.lax.scan(
+        _scan, (params, opt_state, rng), jnp.arange(num_epochs * num_batches)
+    )
+
+    return params, opt_state, losses[-1]
 
 
 def train(env: TrainingEnv, ctrl: SamplingBasedController) -> None:
