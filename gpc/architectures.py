@@ -51,11 +51,11 @@ class MLP(nn.Module):
         return x
 
 
-class ScoreMLP(nn.Module):
-    """A pickle-able module for estimating the observation-conditioned score.
+class DenoisingMLP(nn.Module):
+    """A pickle-able module for performing action sequence denoising.
 
-    The score s(U, y) has shape (num_steps, action_dim), where U is the action
-    sequence and y is the initial observation.
+    This computes U <-- NNet(U, y, t), where U is the action sequence, y is the
+    initial observation, and t is the time step in the denoising process.
 
     Args:
         hidden_layers: Sizes of all hidden layers.
@@ -65,13 +65,13 @@ class ScoreMLP(nn.Module):
     hidden_layers: Sequence[int]
 
     @nn.compact
-    def __call__(self, u: jax.Array, y: jax.Array) -> jax.Array:
+    def __call__(self, u: jax.Array, y: jax.Array, t: jax.Array) -> jax.Array:
         """Forward pass through the network."""
         batches = u.shape[:-2]
         num_steps = u.shape[-2]
         action_dim = u.shape[-1]
         u_flat = u.reshape(batches + (num_steps * action_dim,))
-        x = jnp.concatenate([u_flat, y], axis=-1)
+        x = jnp.concatenate([u_flat, y, t], axis=-1)
         x = MLP(self.hidden_layers + (num_steps * action_dim,))(x)
         return x.reshape((batches) + (num_steps, action_dim))
 

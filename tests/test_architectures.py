@@ -4,7 +4,12 @@ from pathlib import Path
 import jax
 import jax.numpy as jnp
 
-from gpc.architectures import MLP, ActionSequenceMLP, print_module_summary
+from gpc.architectures import (
+    MLP,
+    ActionSequenceMLP,
+    DenoisingMLP,
+    print_module_summary,
+)
 
 
 def test_mlp_construction() -> None:
@@ -98,7 +103,36 @@ def test_action_sequence_mlp() -> None:
     assert U.shape == (14, 24, num_steps, action_dim)
 
 
+def test_denoising_mlp() -> None:
+    """Test the denoising MLP."""
+    rng = jax.random.key(0)
+    num_steps = 5
+    action_dim = 3
+    obs_dim = 4
+
+    # Define the network architecture
+    net = DenoisingMLP(hidden_layers=(32, 32))
+
+    # Initialize network parameters
+    U = jnp.ones((num_steps, action_dim))
+    y = jnp.ones(obs_dim)
+    t = jnp.ones(1)
+    params = net.init(rng, U, y, t)
+
+    # Check the output shape
+    U_out = net.apply(params, U, y, t)
+    assert U_out.shape == (num_steps, action_dim)
+
+    # Try with a batch of sequences
+    U = jnp.ones((14, 24, num_steps, action_dim))
+    y = jnp.ones((14, 24, obs_dim))
+    t = jnp.ones((14, 24, 1))
+    U_out = net.apply(params, U, y, t)
+    assert U_out.shape == U.shape
+
+
 if __name__ == "__main__":
     test_mlp_construction()
     test_mlp_save_load()
     test_action_sequence_mlp()
+    test_denoising_mlp()
