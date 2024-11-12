@@ -20,9 +20,9 @@ if __name__ == "__main__":
 
     if sys.argv[1] == "train":
         # Train the policy and save it to a file
-        ctrl = PredictiveSampling(env.task, num_samples=128, noise_level=0.5)
+        ctrl = PredictiveSampling(env.task, num_samples=64, noise_level=0.3)
         net = ActionSequenceMLP(
-            [128, 128], env.task.planning_horizon, env.task.model.nu
+            [256, 256, 256], env.task.planning_horizon, env.task.model.nu
         )
         policy = train(
             env,
@@ -31,9 +31,9 @@ if __name__ == "__main__":
             log_dir="/tmp/gpc_walker",
             num_iters=10,
             num_envs=128,
-            batch_size=512,
-            num_epochs=20,
-            learning_rate=1e-3,
+            batch_size=128,
+            num_epochs=3,
+            learning_rate=3e-4,
         )
         policy.save(save_file)
         print(f"Saved policy to {save_file}")

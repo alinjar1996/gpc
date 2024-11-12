@@ -7,6 +7,7 @@ from hydrax.task_base import Task
 from hydrax.tasks.cart_pole import CartPole
 from hydrax.tasks.particle import Particle
 from hydrax.tasks.pendulum import Pendulum
+from hydrax.tasks.walker import Walker
 from mujoco import mjx
 
 
@@ -154,3 +155,23 @@ class CartPoleEnv(TrainingEnv):
     def observation_size(self) -> int:
         """The size of the observation space (includes sin and cos)."""
         return 5
+
+
+class WalkerEnv(TrainingEnv):
+    """Training environment for the walker task."""
+
+    def __init__(self, episode_length: int) -> None:
+        """Set up the walker training environment."""
+        super().__init__(task=Walker(), episode_length=episode_length)
+
+    def reset(self, data: mjx.Data, rng: jax.Array) -> mjx.Data:
+        """Reset the simulator to start a new episode."""
+        rng, pos_rng, vel_rng = jax.random.split(rng, 3)
+        qpos = jax.random.uniform(pos_rng, (9,), minval=-0.1, maxval=0.1)
+        qvel = jax.random.uniform(vel_rng, (9,), minval=-5.0, maxval=5.0)
+        return data.replace(qpos=qpos, qvel=qvel)
+
+    @property
+    def observation_size(self) -> int:
+        """The size of the observation space."""
+        return 17
