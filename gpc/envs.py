@@ -1,9 +1,11 @@
 from abc import ABC, abstractmethod
 
 import jax
+import jax.numpy as jnp
 from flax.struct import dataclass
 from hydrax.task_base import Task
 from hydrax.tasks.particle import Particle
+from hydrax.tasks.pendulum import Pendulum
 from mujoco import mjx
 
 
@@ -105,3 +107,23 @@ class ParticleEnv(TrainingEnv):
     def observation_size(self) -> int:
         """The size of the observation space."""
         return 4
+
+
+class PendulumEnv(TrainingEnv):
+    """Training environment for the pendulum swingup task."""
+
+    def __init__(self, episode_length: int) -> None:
+        """Set up the pendulum training environment."""
+        super().__init__(task=Pendulum(), episode_length=episode_length)
+
+    def reset(self, data: mjx.Data, rng: jax.Array) -> mjx.Data:
+        """Reset the simulator to start a new episode."""
+        rng, pos_rng, vel_rng = jax.random.split(rng, 3)
+        qpos = jax.random.uniform(pos_rng, (1,), minval=-jnp.pi, maxval=jnp.pi)
+        qvel = jax.random.uniform(vel_rng, (1,), minval=-1.0, maxval=1.0)
+        return data.replace(qpos=qpos, qvel=qvel)
+
+    @property
+    def observation_size(self) -> int:
+        """The size of the observation space (sin, cos, theta_dot)."""
+        return 3
