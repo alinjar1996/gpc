@@ -115,6 +115,7 @@ class PendulumEnv(TrainingEnv):
     def __init__(self, episode_length: int) -> None:
         """Set up the pendulum training environment."""
         super().__init__(task=Pendulum(), episode_length=episode_length)
+        # TODO: set planning horizon in task constructor
         self.task.planning_horizon = 10
 
     def reset(self, data: mjx.Data, rng: jax.Array) -> mjx.Data:
