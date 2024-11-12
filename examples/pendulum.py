@@ -29,8 +29,11 @@ if __name__ == "__main__":
             ctrl,
             net,
             log_dir="/tmp/gpc_pendulum",
-            num_iters=10,
+            num_iters=100,
             num_envs=128,
+            batch_size=512,
+            num_epochs=10,
+            learning_rate=1e-3,
         )
         policy.save(save_file)
         print(f"Saved policy to {save_file}")
