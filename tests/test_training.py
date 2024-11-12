@@ -77,19 +77,20 @@ def test_fit() -> None:
         y, U, net, params, optimizer, opt_state, fit_rng, batch_size, num_epochs
     )
     print("Final loss:", loss)
+    assert loss < 1.0
     print("Fit time:", time.time() - st)
 
     # Try generating some actions
     rng, test_rng = jax.random.split(rng)
-    y = jnp.linspace(0.0, 1.0, 100)[:, None]
-    U = jax.random.normal(test_rng, (100, 1, 1))
+    y_test = jnp.linspace(0.0, 1.0, 100)[:, None]
+    U_test = jax.random.normal(test_rng, (100, 1, 1))
     dt = 0.1
     for t in jnp.arange(0.0, 1.0, dt):
-        v = net.apply(params, U, y, jnp.tile(t, (100, 1)))
-        U += v * dt
+        v = net.apply(params, U_test, y_test, jnp.tile(t, (100, 1)))
+        U_test += v * dt
 
     if __name__ == "__main__":
-        plt.scatter(y, U[:, 0, 0])
+        plt.scatter(y_test, U_test[:, 0, 0])
         plt.xlabel("Observation")
         plt.ylabel("Action")
         plt.show()
