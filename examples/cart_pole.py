@@ -2,7 +2,7 @@ import sys
 
 from hydrax.algs import PredictiveSampling
 
-from gpc.architectures import ActionSequenceMLP
+from gpc.architectures import DenoisingMLP
 from gpc.envs import CartPoleEnv
 from gpc.policy import Policy
 from gpc.testing import test_interactive
@@ -21,14 +21,11 @@ if __name__ == "__main__":
     if sys.argv[1] == "train":
         # Train the policy and save it to a file
         ctrl = PredictiveSampling(env.task, num_samples=64, noise_level=0.3)
-        net = ActionSequenceMLP(
-            [64, 64], env.task.planning_horizon, env.task.model.nu
-        )
+        net = DenoisingMLP([64, 64])
         policy = train(
             env,
             ctrl,
             net,
-            policy_noise_level=0.1,
             num_policy_samples=64,
             log_dir="/tmp/gpc_cart_pole",
             num_iters=10,
