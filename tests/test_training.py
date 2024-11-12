@@ -139,8 +139,13 @@ def test_policy() -> None:
 
     # Create a toy network and parameters
     rng, init_rng = jax.random.split(rng)
-    mlp = ActionSequenceMLP([64, 64], num_steps, num_actions)
-    params = mlp.init(init_rng, jnp.zeros(num_obs))
+    mlp = DenoisingMLP([64, 64])
+    params = mlp.init(
+        init_rng,
+        jnp.zeros((num_steps, num_actions)),
+        jnp.zeros(num_obs),
+        jnp.zeros(1),
+    )
 
     # Create the policy
     u_min = -2 * jnp.ones(num_actions)
@@ -148,9 +153,14 @@ def test_policy() -> None:
     policy = Policy(mlp, params, u_min, u_max)
 
     # Test running the policy
+    rng, apply_rng = jax.random.split(rng)
+    U = jnp.zeros((num_steps, num_actions))
     y = jnp.ones((num_obs,))
-    u = policy.apply(y)
-    assert u.shape == (num_steps, num_actions)
+    U1 = policy.apply(U, y, apply_rng)
+    assert U1.shape == (num_steps, num_actions)
+
+    assert jnp.all(U1 >= u_min)
+    assert jnp.all(U1 <= u_max)
 
     # Save and load the policy
     local_dir = Path("_test_policy")
@@ -161,8 +171,8 @@ def test_policy() -> None:
 
     policy = Policy.load(local_dir / "policy.pkl")
 
-    u2 = policy.apply(y)
-    assert jnp.allclose(u2, u)
+    U2 = policy.apply(U, y, apply_rng)
+    assert jnp.allclose(U2, U1)
 
     # Cleanup
     for p in local_dir.iterdir():
@@ -172,6 +182,6 @@ def test_policy() -> None:
 
 if __name__ == "__main__":
     # test_simulate()
-    test_fit()
+    # test_fit()
     # test_train()
-    # test_policy()
+    test_policy()
