@@ -171,7 +171,7 @@ def test_policy() -> None:
 
     policy = Policy.load(local_dir / "policy.pkl")
 
-    U2 = policy.apply(U, y, apply_rng)
+    U2 = jax.jit(policy.apply)(U, y, apply_rng)
     assert jnp.allclose(U2, U1)
 
     # Cleanup
