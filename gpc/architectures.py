@@ -62,6 +62,7 @@ class DenoisingMLP(nn.Module):
 
     """
 
+    # TODO: consider storing num_steps, action_dim as attributes on construction
     hidden_layers: Sequence[int]
 
     @nn.compact

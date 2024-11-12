@@ -22,21 +22,25 @@ def test_simulate() -> None:
     ctrl = PolicyAugmentedController(
         PredictiveSampling(env.task, num_samples=8, noise_level=0.1),
         num_policy_samples=8,
-        policy_noise_level=0.1,
     )
-    net = ActionSequenceMLP(
-        [32, 32], env.task.planning_horizon, env.task.model.nu
-    )
+    net = DenoisingMLP([32, 32])
     rng, init_rng = jax.random.split(rng)
-    params = net.init(init_rng, jnp.zeros(env.observation_size))
+    params = net.init(
+        init_rng,
+        jnp.zeros((env.task.planning_horizon, env.task.model.nu)),
+        jnp.zeros(env.observation_size),
+        jnp.zeros(1),
+    )
+
+    policy = Policy(net, params, env.task.u_min, env.task.u_max)
 
     rng, episode_rng = jax.random.split(rng)
-    y, U, J_best, J_pred = simulate_episode(env, ctrl, net, params, episode_rng)
+    y, U, J_spc, J_policy = simulate_episode(env, ctrl, policy, episode_rng)
 
     assert y.shape == (13, 4)
     assert U.shape == (13, 5, 2)
-    assert J_best.shape == (13,)
-    assert J_pred.shape == (13,)
+    assert J_spc.shape == (13,)
+    assert J_policy.shape == (13,)
 
 
 def test_fit() -> None:
@@ -181,7 +185,7 @@ def test_policy() -> None:
 
 
 if __name__ == "__main__":
-    # test_simulate()
+    test_simulate()
     # test_fit()
     # test_train()
-    test_policy()
+    # test_policy()

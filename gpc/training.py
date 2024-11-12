@@ -33,8 +33,8 @@ def simulate_episode(
     Returns:
         y: The observations at each time step.
         U: The optimal actions at each time step.
-        J_best: cost of the best actions at each time step.
-        J_pred: cost of the policy network's actions at each time step.
+        J_spc: cost of the best action sequence found by SPC at each time step.
+        J_policy: cost of the best action sequence found by the policy.
     """
     rng, ctrl_rng, env_rng = jax.random.split(rng, 3)
 
@@ -46,36 +46,44 @@ def simulate_episode(
     psi = psi.replace(base_params=psi.base_params.replace(rng=ctrl_rng))
 
     def _scan_fn(carry: Tuple[SimulatorState, PACParams], t: int) -> Tuple:
-        """Take step in the loop."""
+        """Take simulation step, and record all data."""
         x, psi = carry
 
-        # Generate an action sequence from the learned policy
+        # Sample action sequences from the learned policy
+        # TODO: consider warm-starting the policy
         y = env.get_observation(x)
-        U_pred = net.apply(params, y)
+        rng, policy_rng = jax.random.split(psi.base_params.rng)
+        policy_rngs = jax.random.split(policy_rng, ctrl.num_policy_samples)
+        U = jnp.zeros((env.task.planning_horizon, env.task.model.nu))
+        Us = jax.vmap(policy.apply, in_axes=(None, None, 0))(U, y, policy_rngs)
 
-        # Using the predicted action sequence as one of the samples, find an
-        # optimal action sequence
-        psi = psi.replace(prediction=U_pred)
+        # Place the samples into the predictive control parameters so they
+        # can be used in the predictive control update
+        psi = psi.replace(
+            policy_samples=Us, base_params=psi.base_params.replace(rng=rng)
+        )
+
+        # Update the action sequence with sampling-based predictive control
         psi, rollouts = ctrl.optimize(x.data, psi)
         U_star = ctrl.get_action_sequence(psi)
 
-        # Record the cost of the predicted action sequence relative to the
-        # best sample.
+        # Record the lowest costs achieved by SPC and the policy
+        # TODO: deal with randomizations properly
+        # TODO: consider logging average costs, or something more informative
         costs = jnp.sum(rollouts.costs[0], axis=1)
-        best_cost = jnp.min(costs)
-        # TODO: this is no longer accurate, since U_pred is not in the samples
-        pred_cost = costs[-1]
+        spc_best = jnp.min(costs[: -ctrl.num_policy_samples])
+        policy_best = jnp.min(costs[ctrl.num_policy_samples :])
 
         # Step the simulation
         x = env.step(x, U_star[0])
 
-        return (x, psi), (y, U_star, best_cost, pred_cost)
+        return (x, psi), (y, U_star, spc_best, policy_best)
 
-    _, (y, U, J_best, J_pred) = jax.lax.scan(
+    _, (y, U, J_spc, J_policy) = jax.lax.scan(
         _scan_fn, (x, psi), jnp.arange(env.episode_length)
     )
 
-    return y, U, J_best, J_pred
+    return y, U, J_spc, J_policy
 
 
 def fit_policy(
