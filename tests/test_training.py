@@ -6,8 +6,9 @@ import jax
 import jax.numpy as jnp
 import optax
 from hydrax.algs import PredictiveSampling
+import matplotlib.pyplot as plt
 
-from gpc.architectures import ActionSequenceMLP
+from gpc.architectures import ActionSequenceMLP, DenoisingMLP
 from gpc.augmented import PolicyAugmentedController
 from gpc.envs import ParticleEnv
 from gpc.policy import Policy
@@ -44,13 +45,24 @@ def test_fit() -> None:
 
     # Make some fake data
     rng, obs_rng, act_rng = jax.random.split(rng, 3)
-    y = jax.random.uniform(obs_rng, (128, 4))
-    U = 1.2 + 0.05 * jax.random.uniform(act_rng, (128, 5, 2))
+    y1 = jax.random.uniform(obs_rng, (128, 1))
+    y2 = jax.random.uniform(obs_rng, (128, 1))
+    y = jnp.concatenate([y1, y2], axis=0)
+    U1 = -0.5 - y1[..., None] + 0.1 * jax.random.normal(act_rng, (128, 1, 1))
+    U2 = 0.5 * y1[..., None] + 0.1 * jax.random.normal(act_rng, (128, 1, 1))
+    U = jnp.concatenate([U1, U2], axis=0)
+
+    # Plot the training data
+    if __name__=="__main__":
+        plt.scatter(y, U[:, 0, 0])
+        plt.xlabel("Observation")
+        plt.ylabel("Action")
+        plt.show(block=False)
 
     # Set up the policy network
-    net = ActionSequenceMLP([32, 32], 5, 2)
+    net = DenoisingMLP([32, 32])
     rng, init_rng = jax.random.split(rng)
-    params = net.init(init_rng, jnp.zeros(4))
+    params = net.init(init_rng, jnp.zeros((1, 1)), jnp.zeros(1), jnp.zeros(1))
 
     # Initialize the optimizer
     optimizer = optax.adam(1e-3)
@@ -66,6 +78,8 @@ def test_fit() -> None:
     )
     print("Fit time:", time.time() - st)
     assert loss < 0.1
+    
+    breakpoint()
 
     # Check that we successfully overfit
     U_pred = net.apply(params, y[0])
@@ -147,7 +161,7 @@ def test_policy() -> None:
 
 
 if __name__ == "__main__":
-    test_simulate()
+    # test_simulate()
     test_fit()
-    test_train()
-    test_policy()
+    # test_train()
+    # test_policy()

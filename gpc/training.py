@@ -8,7 +8,7 @@ import optax
 from hydrax.alg_base import SamplingBasedController
 from tensorboardX import SummaryWriter
 
-from gpc.architectures import ActionSequenceMLP
+from gpc.architectures import ActionSequenceMLP, DenoisingMLP
 from gpc.augmented import PACParams, PolicyAugmentedController
 from gpc.envs import SimulatorState, TrainingEnv
 from gpc.policy import Policy
@@ -83,7 +83,7 @@ def simulate_episode(
 def fit_policy(
     observations: jax.Array,
     action_sequences: jax.Array,
-    net: ActionSequenceMLP,
+    net: DenoisingMLP,
     params: Params,
     optimizer: optax.GradientTransformation,
     opt_state: optax.OptState,
@@ -91,12 +91,12 @@ def fit_policy(
     batch_size: int,
     num_epochs: int,
 ) -> Tuple[Params, optax.OptState, jax.Array]:
-    """Fit the policy network U = NNet(y) to the given data.
+    """Fit a flow matching model to the data.
 
     Args:
         observations: The observations y.
         action_sequences: The corresponding target action sequences U.
-        net: The policy network.
+        net: The policy network, which outputs the flow matching vector field.
         params: The policy network parameters.
         optimizer: The optimizer (e.g. Adam).
         opt_state: The optimizer state.
@@ -112,10 +112,30 @@ def fit_policy(
     num_data_points = observations.shape[0]
     num_batches = max(1, num_data_points // batch_size)
 
-    def _loss_fn(params: Params, obs: jax.Array, act: jax.Array) -> jax.Array:
-        """Compute the regression loss for the policy network."""
-        pred = net.apply(params, obs)
-        return jnp.mean(jnp.square(act - pred))
+    def _loss_fn(params: Params, obs: jax.Array, act: jax.Array, noise: jax.Array, t: jax.Array) -> jax.Array:
+        """Compute the flow-matching loss."""
+        noised_action = t[..., None] * act + (1 - t[..., None]) * noise
+        target = act - noise
+        print("Action shape:", act.shape)
+        print("T shape:", t.shape)
+        print("Noised action shape:", noised_action.shape)
+        print("Target shape:", target.shape)
+        print("Obs shape:", obs.shape)
+        pred = net.apply(params, noised_action, obs, t)
+        return jnp.mean(jnp.square(pred - target))
+    
+    # Sample noise for the denoising process
+    rng, noise_rng = jax.random.split(rng)
+    noise = jax.random.normal(noise_rng, action_sequences.shape)
+
+    # Sample a time step for the denoising process
+    rng, t_rng = jax.random.split(rng)
+    t = jax.random.uniform(t_rng, (observations.shape[:-1] + (1,)))
+
+    loss = _loss_fn(params, observations, action_sequences, noise, t)
+    print(loss)
+    
+    breakpoint()
 
     def _sgd_step(
         params: Params,
