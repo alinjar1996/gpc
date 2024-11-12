@@ -8,7 +8,7 @@ import matplotlib.pyplot as plt
 import optax
 from hydrax.algs import PredictiveSampling
 
-from gpc.architectures import ActionSequenceMLP, DenoisingMLP
+from gpc.architectures import DenoisingMLP
 from gpc.augmented import PolicyAugmentedController
 from gpc.envs import ParticleEnv
 from gpc.policy import Policy
@@ -107,23 +107,24 @@ def test_train() -> None:
 
     env = ParticleEnv()
     ctrl = PredictiveSampling(env.task, num_samples=8, noise_level=0.1)
-    net = ActionSequenceMLP(
-        [32, 32], env.task.planning_horizon, env.task.model.nu
-    )
+    net = DenoisingMLP([32, 32])
     policy = train(
         env,
         ctrl,
         net,
-        log_dir=log_dir,
         num_policy_samples=8,
-        policy_noise_level=0.1,
+        log_dir=log_dir,
         num_iters=3,
         num_envs=128,
     )
 
     assert isinstance(policy, Policy)
+
+    # Test the policy
+    rng = jax.random.key(0)
     y = jnp.array([-0.1, 0.1, 0.0, 0.0])
-    U = policy.apply(y)
+    U = jnp.zeros((env.task.planning_horizon, env.task.model.nu))
+    U = policy.apply(U, y, rng)
 
     # Check that the policy output points in the right direction
     assert U.shape == (env.task.planning_horizon, env.task.model.nu)
@@ -185,7 +186,7 @@ def test_policy() -> None:
 
 
 if __name__ == "__main__":
-    test_simulate()
+    # test_simulate()
     # test_fit()
-    # test_train()
+    test_train()
     # test_policy()
