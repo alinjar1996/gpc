@@ -51,7 +51,16 @@ class PredictionAugmentedController(SamplingBasedController):
         samples, base_params = self.base_ctrl.sample_controls(
             params.base_params
         )
-        samples = samples.at[-1].set(params.prediction)
+
+        # samples = samples.at[-1].set(params.prediction)
+
+        rng = base_params.rng
+        rng, noise_rng = jax.random.split(rng)
+        noise = jax.random.normal(noise_rng, samples.shape)
+        pred_samples = params.prediction + 0.1 * noise
+        samples = jnp.append(pred_samples, samples, axis=0)
+        base_params = base_params.replace(rng=rng)
+
         return samples, params.replace(base_params=base_params)
 
     def update_params(

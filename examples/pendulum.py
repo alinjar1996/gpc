@@ -15,7 +15,7 @@ if __name__ == "__main__":
         print(usage)
         sys.exit(1)
 
-    env = PendulumEnv(episode_length=100)
+    env = PendulumEnv(episode_length=200)
     save_file = "/tmp/pendulum_policy.pkl"
 
     if sys.argv[1] == "train":
