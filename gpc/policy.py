@@ -4,35 +4,32 @@ from typing import Any, Union
 
 import jax
 import jax.numpy as jnp
+from flax.struct import dataclass
 
 from gpc.architectures import DenoisingMLP
 
 
+@dataclass
 class Policy:
-    """A pickle-able Generative Predictive Control policy."""
+    """A pickle-able Generative Predictive Control policy.
 
-    def __init__(
-        self,
-        net: DenoisingMLP,
-        params: Any,
-        u_min: jax.Array,
-        u_max: jax.Array,
-        dt: float = 0.1,
-    ):
-        """Create a new GPC policy, which generates actions with flow matching.
+    Generates action sequences using flow matching, conditioned on the latest
+    observation.
 
-        Args:
-            net: The flow matching network that generates the action sequence.
-            params: The parameters of the network.
-            u_min: The minimum action values.
-            u_max: The maximum action values.
-            dt: The integration step size for flow matching.
-        """
-        self.net = net
-        self.params = params
-        self.u_min = u_min
-        self.u_max = u_max
-        self.dt = dt
+    Attributes:
+        net: The flow matching network that generates the action sequence.
+        params: The parameters of the network.
+        u_min: The minimum action values.
+        u_max: The maximum action values.
+        dt: The integration step size for flow matching.
+
+    """
+
+    net: DenoisingMLP
+    params: Any
+    u_min: jax.Array
+    u_max: jax.Array
+    dt: float = 0.1
 
     def save(self, path: Union[Path, str]) -> None:
         """Save the policy to a file.
