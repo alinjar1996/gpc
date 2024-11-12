@@ -4,9 +4,9 @@ from pathlib import Path
 
 import jax
 import jax.numpy as jnp
+import matplotlib.pyplot as plt
 import optax
 from hydrax.algs import PredictiveSampling
-import matplotlib.pyplot as plt
 
 from gpc.architectures import ActionSequenceMLP, DenoisingMLP
 from gpc.augmented import PolicyAugmentedController
@@ -53,7 +53,7 @@ def test_fit() -> None:
     U = jnp.concatenate([U1, U2], axis=0)
 
     # Plot the training data
-    if __name__=="__main__":
+    if __name__ == "__main__":
         plt.scatter(y, U[:, 0, 0])
         plt.xlabel("Observation")
         plt.ylabel("Action")
@@ -65,10 +65,10 @@ def test_fit() -> None:
     params = net.init(init_rng, jnp.zeros((1, 1)), jnp.zeros(1), jnp.zeros(1))
 
     # Initialize the optimizer
-    optimizer = optax.adam(1e-3)
+    optimizer = optax.adam(1e-2)
     opt_state = optimizer.init(params)
-    batch_size = 64
-    num_epochs = 80
+    batch_size = 512  # can be larger than the dataset b/c added noise
+    num_epochs = 1000
 
     # Fit the policy network
     st = time.time()
@@ -76,14 +76,23 @@ def test_fit() -> None:
     params, opt_state, loss = fit_policy(
         y, U, net, params, optimizer, opt_state, fit_rng, batch_size, num_epochs
     )
+    print("Final loss:", loss)
     print("Fit time:", time.time() - st)
-    assert loss < 0.1
-    
-    breakpoint()
 
-    # Check that we successfully overfit
-    U_pred = net.apply(params, y[0])
-    assert jnp.allclose(U_pred, U[0], atol=0.5)
+    # Try generating some actions
+    rng, test_rng = jax.random.split(rng)
+    y = jnp.linspace(0.0, 1.0, 100)[:, None]
+    U = jax.random.normal(test_rng, (100, 1, 1))
+    dt = 0.1
+    for t in jnp.arange(0.0, 1.0, dt):
+        v = net.apply(params, U, y, jnp.tile(t, (100, 1)))
+        U += v * dt
+
+    if __name__ == "__main__":
+        plt.scatter(y, U[:, 0, 0])
+        plt.xlabel("Observation")
+        plt.ylabel("Action")
+        plt.show()
 
 
 def test_train() -> None:

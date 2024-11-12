@@ -112,39 +112,36 @@ def fit_policy(
     num_data_points = observations.shape[0]
     num_batches = max(1, num_data_points // batch_size)
 
-    def _loss_fn(params: Params, obs: jax.Array, act: jax.Array, noise: jax.Array, t: jax.Array) -> jax.Array:
+    def _loss_fn(
+        params: Params,
+        obs: jax.Array,
+        act: jax.Array,
+        noise: jax.Array,
+        t: jax.Array,
+    ) -> jax.Array:
         """Compute the flow-matching loss."""
         noised_action = t[..., None] * act + (1 - t[..., None]) * noise
         target = act - noise
-        print("Action shape:", act.shape)
-        print("T shape:", t.shape)
-        print("Noised action shape:", noised_action.shape)
-        print("Target shape:", target.shape)
-        print("Obs shape:", obs.shape)
         pred = net.apply(params, noised_action, obs, t)
         return jnp.mean(jnp.square(pred - target))
-    
-    # Sample noise for the denoising process
-    rng, noise_rng = jax.random.split(rng)
-    noise = jax.random.normal(noise_rng, action_sequences.shape)
 
-    # Sample a time step for the denoising process
-    rng, t_rng = jax.random.split(rng)
-    t = jax.random.uniform(t_rng, (observations.shape[:-1] + (1,)))
-
-    loss = _loss_fn(params, observations, action_sequences, noise, t)
-    print(loss)
-    
-    breakpoint()
-
-    def _sgd_step(
+    def _opt_step(
         params: Params,
         opt_state: optax.OptState,
         obs: jax.Array,
         act: jax.Array,
+        rng: jax.Array,
     ) -> Tuple[Params, optax.OptState, jax.Array]:
         """Perform a gradient descent step on the given batch of data."""
-        loss, grad = jax.value_and_grad(_loss_fn)(params, obs, act)
+        # Sample noise and time steps for the flow matching targets
+        rng, noise_rng, t_rng = jax.random.split(rng, 3)
+        noise = jax.random.normal(noise_rng, act.shape)
+        t = jax.random.uniform(t_rng, (obs.shape[:-1] + (1,)))
+
+        # Compute the loss and its gradient
+        loss, grad = jax.value_and_grad(_loss_fn)(params, obs, act, noise, t)
+
+        # Update the parameters
         updates, opt_state = optimizer.update(grad, opt_state)
         params = optax.apply_updates(params, updates)
         return params, opt_state, loss
@@ -162,11 +159,13 @@ def fit_policy(
         batch_act = action_sequences[batch_idx]
 
         # Do an optimizer step
-        params, opt_state, loss = _sgd_step(
+        rng, step_rng = jax.random.split(rng)
+        params, opt_state, loss = _opt_step(
             params,
             opt_state,
             batch_obs,
             batch_act,
+            step_rng,
         )
 
         return (params, opt_state, rng), loss
