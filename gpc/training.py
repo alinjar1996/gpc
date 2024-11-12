@@ -19,8 +19,7 @@ Params = Any
 def simulate_episode(
     env: TrainingEnv,
     ctrl: PolicyAugmentedController,
-    net: ActionSequenceMLP,
-    params: Params,
+    policy: Policy,
     rng: jax.Array,
 ) -> Tuple[jax.Array, jax.Array, jax.Array, jax.Array]:
     """Starting from a random initial state, run SPC and record training data.
@@ -28,8 +27,7 @@ def simulate_episode(
     Args:
         env: The training environment.
         ctrl: The sampling-based controller (augmented with a learned policy).
-        net: The policy network.
-        params: The policy network parameters.
+        policy: The generative policy network.
         rng: The random number generator key.
 
     Returns:
@@ -48,7 +46,7 @@ def simulate_episode(
     psi = psi.replace(base_params=psi.base_params.replace(rng=ctrl_rng))
 
     def _scan_fn(carry: Tuple[SimulatorState, PACParams], t: int) -> Tuple:
-        """Take step in the training loop."""
+        """Take step in the loop."""
         x, psi = carry
 
         # Generate an action sequence from the learned policy
