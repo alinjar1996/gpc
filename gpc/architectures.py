@@ -77,7 +77,7 @@ class ScoreMLP(nn.Module):
 
 
 class ActionSequenceMLP(nn.Module):
-    """A pickle-able module for generating action.
+    """A pickle-able module for generating a sequence of actions.
 
     Generates an action sequence U = NNet(y), where y is the observation. The
     action sequence has shape (num_steps, action_dim).

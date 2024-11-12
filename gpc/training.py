@@ -1,173 +1,304 @@
-import pickle
 import time
 from pathlib import Path
 from typing import Any, Tuple, Union
 
-import flax.linen as nn
 import jax
 import jax.numpy as jnp
 import optax
-from hydrax.task_base import Task
+from hydrax.alg_base import SamplingBasedController
+from tensorboardX import SummaryWriter
 
-from gpc.dataset import TrainingData
+from gpc.architectures import ActionSequenceMLP
+from gpc.augmented import PACParams, PolicyAugmentedController
+from gpc.envs import SimulatorState, TrainingEnv
+from gpc.policy import Policy
 
 Params = Any
 
 
-class Policy:
-    """A pickle-able Generative Predictive Control policy."""
-
-    def __init__(
-        self, net: nn.Module, params: Any, u_min: jax.Array, u_max: jax.Array
-    ):
-        """Create a new GPC policy.
-
-        Args:
-            net: The network that maps action sequence and observation to a new
-                 action sequence.
-            params: The parameters of the network.
-            u_min: The minimum action values.
-            u_max: The maximum action values.
-        """
-        self.net = net
-        self.params = params
-        self.u_min = u_min
-        self.u_max = u_max
-
-    def save(self, path: Union[Path, str]) -> None:
-        """Save the policy to a file.
-
-        Args:
-            path: The path to save the policy to.
-        """
-        with open(path, "wb") as f:
-            pickle.dump(self, f)
-
-    @staticmethod
-    def load(path: Union[Path, str]) -> "Policy":
-        """Load a policy from a file.
-
-        Args:
-            path: The path to load the policy from.
-
-        Returns:
-            The loaded policy instance
-        """
-        with open(path, "rb") as f:
-            return pickle.load(f)
-
-    def apply(self, y: jax.Array) -> jax.Array:
-        """Apply the policy, generating an action sequence.
-
-        Args:
-            u: The current action sequence.
-            y: The current observation.
-
-        Returns:
-            The updated action sequence
-        """
-        u_new = self.net.apply(self.params, y)
-        return jax.numpy.clip(u_new, self.u_min, self.u_max)
-
-
-def train(
-    data: TrainingData,
-    task: Task,
-    net: nn.Module,
-    batch_size: int = 128,
-    epochs: int = 100,
-    learning_rate: float = 1e-3,
-    print_every: int = 10,
-) -> Policy:
-    """Train a GPC policy based on the given training data.
+def simulate_episode(
+    env: TrainingEnv,
+    ctrl: PolicyAugmentedController,
+    net: ActionSequenceMLP,
+    params: Params,
+    rng: jax.Array,
+) -> Tuple[jax.Array, jax.Array, jax.Array, jax.Array]:
+    """Starting from a random initial state, run SPC and record training data.
 
     Args:
-        data: The training data to use.
-        task: The task to train the policy for.
-        net: Network architecture, U_new = NNet(U_old, y).
-        batch_size: The number of data points in each batch.
-        epochs: The number of epochs (passes over the whole dataset).
-        learning_rate: The learning rate for the Adam optimizer.
-        print_every: The number of epochs between printing progress data.
+        env: The training environment.
+        ctrl: The sampling-based controller (augmented with a learned policy).
+        net: The policy network.
+        params: The policy network parameters.
+        rng: The random number generator key.
 
     Returns:
-        The trained policy.
+        y: The observations at each time step.
+        U: The optimal actions at each time step.
+        J_best: cost of the best actions at each time step.
+        J_pred: cost of the policy network's actions at each time step.
     """
-    rng = jax.random.key(0)  # TODO: take as argument
+    rng, ctrl_rng, env_rng = jax.random.split(rng, 3)
 
-    # Determine the action and observation dimensions
-    act_dim = data.new_action_sequence.shape[-1]
-    obs_dim = data.observation.shape[-1]
-    horizon = data.new_action_sequence.shape[-2]
+    # Set the initial state of the environment
+    x = env.init_state(env_rng)
 
-    # Reshape the data to flatten across initial states
-    # TODO: shuffle and train-test split
-    act = data.new_action_sequence.reshape(-1, horizon, act_dim)
-    obs = data.observation.reshape(-1, obs_dim)
+    # Set the initial sampling-based controller parameters
+    psi = ctrl.init_params()
+    psi = psi.replace(base_params=psi.base_params.replace(rng=ctrl_rng))
 
-    num_data_points = act.shape[0]
-    assert obs.shape[0] == num_data_points
+    def _scan_fn(carry: Tuple[SimulatorState, PACParams], t: int) -> Tuple:
+        """Take step in the training loop."""
+        x, psi = carry
 
-    # Initialize the model
-    rng, init_rng = jax.random.split(rng)
-    params = net.init(init_rng, obs[0])
+        # Generate an action sequence from the learned policy
+        y = env.get_observation(x)
+        U_pred = net.apply(params, y)
 
-    # Set up the optimizer
-    optimizer = optax.adam(learning_rate)
-    opt_state = optimizer.init(params)
+        # Using the predicted action sequence as one of the samples, find an
+        # optimal action sequence
+        psi = psi.replace(prediction=U_pred)
+        psi, rollouts = ctrl.optimize(x.data, psi)
+        U_star = ctrl.get_action_sequence(psi)
 
-    # Define loss and parameter update functions
-    def loss_fn(
-        params: Params,
-        obs: jax.Array,
-        act: jax.Array,
-    ) -> jax.Array:
-        """Loss function drives network to predict the new actions."""
+        # Record the cost of the predicted action sequence relative to the
+        # best sample.
+        costs = jnp.sum(rollouts.costs[0], axis=1)
+        best_cost = jnp.min(costs)
+        # TODO: this is no longer accurate, since U_pred is not in the samples
+        pred_cost = costs[-1]
+
+        # Step the simulation
+        x = env.step(x, U_star[0])
+
+        return (x, psi), (y, U_star, best_cost, pred_cost)
+
+    _, (y, U, J_best, J_pred) = jax.lax.scan(
+        _scan_fn, (x, psi), jnp.arange(env.episode_length)
+    )
+
+    return y, U, J_best, J_pred
+
+
+def fit_policy(
+    observations: jax.Array,
+    action_sequences: jax.Array,
+    net: ActionSequenceMLP,
+    params: Params,
+    optimizer: optax.GradientTransformation,
+    opt_state: optax.OptState,
+    rng: jax.Array,
+    batch_size: int,
+    num_epochs: int,
+) -> Tuple[Params, optax.OptState, jax.Array]:
+    """Fit the policy network U = NNet(y) to the given data.
+
+    Args:
+        observations: The observations y.
+        action_sequences: The corresponding target action sequences U.
+        net: The policy network.
+        params: The policy network parameters.
+        optimizer: The optimizer (e.g. Adam).
+        opt_state: The optimizer state.
+        rng: The random number generator key for shuffling the data.
+        batch_size: The batch size.
+        num_epochs: The number of epochs.
+
+    Returns:
+        The updated policy network parameters.
+        The updated optimizer state.
+        The loss from the last epoch.
+    """
+    num_data_points = observations.shape[0]
+    num_batches = max(1, num_data_points // batch_size)
+
+    def _loss_fn(params: Params, obs: jax.Array, act: jax.Array) -> jax.Array:
+        """Compute the regression loss for the policy network."""
         pred = net.apply(params, obs)
-        return jnp.mean((pred - act) ** 2)
+        return jnp.mean(jnp.square(act - pred))
 
-    loss_and_grad = jax.value_and_grad(loss_fn)
-
-    @jax.jit
-    def update_fn(
+    def _sgd_step(
         params: Params,
         opt_state: optax.OptState,
         obs: jax.Array,
         act: jax.Array,
     ) -> Tuple[Params, optax.OptState, jax.Array]:
-        """Perform a gradient descent step."""
-        loss, grad = loss_and_grad(params, obs, act)
+        """Perform a gradient descent step on the given batch of data."""
+        loss, grad = jax.value_and_grad(_loss_fn)(params, obs, act)
         updates, opt_state = optimizer.update(grad, opt_state)
         params = optax.apply_updates(params, updates)
         return params, opt_state, loss
 
-    # Train the model
-    num_batches = num_data_points // batch_size
-    st = time.time()
-    for e in range(epochs):
-        for _ in range(num_batches):
-            # Get a random batch of data
-            rng, batch_rng = jax.random.split(rng)
-            batch_idx = jax.random.randint(
-                batch_rng, (batch_size,), 0, num_data_points
-            )
-            batch_obs = obs[batch_idx]
-            batch_act = act[batch_idx]
+    def _scan(carry: Tuple[Params, optax.OptState, jax.Array], t: int) -> Tuple:
+        """Inner loop function for the optimizer."""
+        params, opt_state, rng = carry
 
-            # Do an optimizer step
-            params, opt_state, loss = update_fn(
-                params,
-                opt_state,
-                batch_obs,
-                batch_act,
-            )
+        # Get a random batch of data
+        rng, batch_rng = jax.random.split(rng)
+        batch_idx = jax.random.randint(
+            batch_rng, (batch_size,), 0, num_data_points
+        )
+        batch_obs = observations[batch_idx]
+        batch_act = action_sequences[batch_idx]
 
-        # TODO: more systematic logging
-        if (e + 1) % print_every == 0:
-            print(
-                f"  epoch {e+1}/{epochs}, loss: {loss:.5f}, "
-                f"time: {time.time() - st:.2f} s"
-            )
+        # Do an optimizer step
+        params, opt_state, loss = _sgd_step(
+            params,
+            opt_state,
+            batch_obs,
+            batch_act,
+        )
 
-    # Construct the policy
-    return Policy(net, params, task.u_min, task.u_max)
+        return (params, opt_state, rng), loss
+
+    (params, opt_state, rng), losses = jax.lax.scan(
+        _scan, (params, opt_state, rng), jnp.arange(num_epochs * num_batches)
+    )
+
+    return params, opt_state, losses[-1]
+
+
+def train(
+    env: TrainingEnv,
+    ctrl: SamplingBasedController,
+    net: ActionSequenceMLP,
+    num_policy_samples: int,
+    policy_noise_level: float,
+    log_dir: Union[Path, str],
+    num_iters: int,
+    num_envs: int,
+    learning_rate: float = 1e-3,
+    batch_size: int = 128,
+    num_epochs: int = 10,
+) -> None:
+    """Train a generative predictive controller.
+
+    Args:
+        env: The training environment.
+        ctrl: The sampling-based predictive control method to use.
+        net: The policy network architecture, maps observation to control tape.
+        num_policy_samples: The number of samples to draw from the policy.
+        policy_noise_level: The standard deviation of the policy noise.
+        log_dir: The directory to log TensorBoard data to.
+        num_iters: The number of training iterations.
+        num_envs: The number of parallel environments to simulate.
+        learning_rate: The learning rate for the policy network.
+        batch_size: The batch size for training the policy network.
+        num_epochs: The number of epochs to train the policy network.
+
+    Note that the total number of parallel simulations is
+        `num_envs * ctrl.num_samples * ctrl.num_randomizations`
+
+    """
+    rng = jax.random.key(0)
+
+    # Set up the sampling-based controller and policy network
+    ctrl = PolicyAugmentedController(
+        ctrl, num_policy_samples, policy_noise_level
+    )
+    assert env.task == ctrl.task
+
+    # Set up the policy network
+    rng, init_rng = jax.random.split(rng)
+    params = net.init(init_rng, jnp.zeros(env.observation_size))
+    U_test = net.apply(params, jnp.zeros(env.observation_size))
+    assert U_test.shape == (env.task.planning_horizon, env.task.model.nu)
+
+    # Initialize the optimizer
+    optimizer = optax.adam(learning_rate)
+    opt_state = optimizer.init(params)
+
+    # Set up the TensorBoard logger
+    datetime = time.strftime("%Y%m%d_%H%M%S")
+    log_dir = Path(log_dir) / datetime
+    print("Logging to", log_dir)
+    tb_writer = SummaryWriter(log_dir)
+
+    # Set up some helper functions
+    @jax.jit
+    def jit_simulate(
+        params: Params, rng: jax.Array
+    ) -> Tuple[jax.Array, jax.Array, jax.Array, jax.Array]:
+        """Simulate episodes in parallel.
+
+        Args:
+            params: The policy network parameters.
+            rng: The random number generator key.
+
+        Returns:
+            y: The observations at each time step.
+            U: The optimal actions at each time step.
+            Average cost of the best action sequence.
+            Average cost of the policy's predicted action sequence.
+        """
+        rngs = jax.random.split(rng, num_envs)
+
+        y, U, J_best, J_pred = jax.vmap(
+            simulate_episode, in_axes=(None, None, None, None, 0)
+        )(env, ctrl, net, params, rngs)
+        return y, U, jnp.mean(J_best), jnp.mean(J_pred)
+
+    @jax.jit
+    def jit_fit(
+        observations: jax.Array,
+        actions: jax.Array,
+        params: Params,
+        opt_state: optax.OptState,
+        rng: jax.Array,
+    ) -> Tuple[Params, optax.OptState, jax.Array]:
+        """Fit the policy network to the data.
+
+        Args:
+            observations: The observations.
+            actions: The best action sequences.
+            params: The policy network parameters.
+            opt_state: The optimizer state.
+            rng: The random number generator key.
+
+        Returns:
+            The updated policy network parameters.
+            The updated optimizer state.
+            The loss from the last epoch.
+        """
+        y = observations.reshape(-1, observations.shape[-1])
+        U = actions.reshape(-1, env.task.planning_horizon, env.task.model.nu)
+        return fit_policy(
+            y, U, net, params, optimizer, opt_state, rng, batch_size, num_epochs
+        )
+
+    for i in range(num_iters):
+        # Simulate using SPC and record the best action sequences. One of the
+        # samples gets replaced with the policy output U = NNet(y).
+        sim_start = time.time()
+        rng, episode_rng = jax.random.split(rng)
+        y, U, J_best, J_pred = jit_simulate(params, episode_rng)
+        sim_time = time.time() - sim_start
+
+        # Fit the policy network U = NNet(y) to the data
+        fit_start = time.time()
+        rng, fit_rng = jax.random.split(rng)
+        params, opt_state, loss = jit_fit(y, U, params, opt_state, fit_rng)
+        fit_time = time.time() - fit_start
+
+        # TODO: run some evaluation tests
+
+        # Print a performance summary
+        print(
+            f"  {i+1}/{num_iters} |"
+            f" policy: {J_pred:.4f} |"
+            f" best: {J_best:.4f} |"
+            f" loss: {loss:.4f} |"
+            f" iter time: {sim_time + fit_time:.4f} s"
+        )
+
+        # Tensorboard logging
+        tb_writer.add_scalar("sim/policy_cost", J_pred, i)
+        tb_writer.add_scalar("sim/best_cost", J_best, i)
+        tb_writer.add_scalar("sim/time", sim_time, i)
+        tb_writer.add_scalar("fit/loss", loss, i)
+        tb_writer.add_scalar("fit/time", fit_time, i)
+        tb_writer.flush()
+
+    # Create a pickle-able policy object
+    policy = Policy(net, params, env.task.u_min, env.task.u_max)
+    return policy

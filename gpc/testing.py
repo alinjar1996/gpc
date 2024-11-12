@@ -4,19 +4,20 @@ import jax
 import jax.numpy as jnp
 import mujoco
 import mujoco.viewer
-from hydrax.task_base import Task
 from mujoco import mjx
 
-from gpc.training import Policy
+from gpc.envs import TrainingEnv
+from gpc.policy import Policy
 
 
-def test_interactive(task: Task, policy: Policy) -> None:
+def test_interactive(env: TrainingEnv, policy: Policy) -> None:
     """Test a GPC policy with an interactive simulation.
 
     Args:
-        task: The task to run the policy on.
+        env: The environment, which defines the system to simulate.
         policy: The GPC policy to test.
     """
+    task = env.task
     jit_policy = jax.jit(policy.apply)
 
     # Set up the mujoco simultion

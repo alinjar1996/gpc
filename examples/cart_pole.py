@@ -1,59 +1,48 @@
 import sys
 
-import jax
-import jax.numpy as jnp
 from hydrax.algs import PredictiveSampling
-from hydrax.tasks.cart_pole import CartPole
-from mujoco import mjx
 
+from gpc.architectures import ActionSequenceMLP
+from gpc.envs import CartPoleEnv
+from gpc.policy import Policy
 from gpc.testing import test_interactive
-from gpc.training import Policy
-from gpc.utils import generate_dataset_and_save, train_policy_and_save
-
-
-def reset_fn(mjx_data: mjx.Data, rng: jax.Array) -> mjx.Data:
-    """Sample a random initial state."""
-    rng, theta_rng, pos_rng, vel_rng = jax.random.split(rng, 4)
-
-    theta = jax.random.uniform(theta_rng, (), minval=-3.14, maxval=3.14)
-    pos = jax.random.uniform(pos_rng, (), minval=-1.8, maxval=1.8)
-    qvel = jax.random.uniform(vel_rng, (2,), minval=-2.0, maxval=2.0)
-    qpos = jnp.array([pos, theta])
-
-    return mjx_data.replace(qpos=qpos, qvel=qvel)
-
+from gpc.training import train
 
 if __name__ == "__main__":
-    # Set parameters
-    task = CartPole()
-    ctrl = PredictiveSampling(task, num_samples=128, noise_level=0.3)
-    num_timesteps = 200
-    num_resets = 128
-    hidden_layers = [64, 64]
+    usage = f"Usage: python {sys.argv[0]} [train|test]"
 
-    # Choose what to do based on command-line arguments
-    generate, fit, deploy = True, True, True
-    if len(sys.argv) == 2:
-        generate = sys.argv[1] == "generate"
-        fit = sys.argv[1] == "fit"
-        deploy = sys.argv[1] == "deploy"
+    if len(sys.argv) != 2:
+        print(usage)
+        sys.exit(1)
 
-    if generate:
-        generate_dataset_and_save(
-            task,
+    env = CartPoleEnv(episode_length=200)
+    save_file = "/tmp/cart_pole_policy.pkl"
+
+    if sys.argv[1] == "train":
+        # Train the policy and save it to a file
+        ctrl = PredictiveSampling(env.task, num_samples=64, noise_level=0.3)
+        net = ActionSequenceMLP(
+            [64, 64], env.task.planning_horizon, env.task.model.nu
+        )
+        policy = train(
+            env,
             ctrl,
-            reset_fn,
-            num_timesteps,
-            num_resets,
-            fname="/tmp/gpc_cart_pole_data.pkl",
+            net,
+            policy_noise_level=0.1,
+            num_policy_samples=64,
+            log_dir="/tmp/gpc_cart_pole",
+            num_iters=10,
+            num_envs=128,
         )
-    if fit:
-        train_policy_and_save(
-            task,
-            dataset_fname="/tmp/gpc_cart_pole_data.pkl",
-            policy_fname="/tmp/gpc_cart_pole_policy.pkl",
-            hidden_layers=hidden_layers,
-        )
-    if deploy:
-        policy = Policy.load("/tmp/gpc_cart_pole_policy.pkl")
-        test_interactive(task, policy)
+        policy.save(save_file)
+        print(f"Saved policy to {save_file}")
+
+    elif sys.argv[1] == "test":
+        # Load the policy from a file and test it interactively
+        print(f"Loading policy from {save_file}")
+        policy = Policy.load(save_file)
+        test_interactive(env, policy)
+
+    else:
+        print(usage)
+        sys.exit(1)
