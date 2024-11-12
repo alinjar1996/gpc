@@ -45,11 +45,11 @@ def test_fit() -> None:
 
     # Make some fake data
     rng, obs_rng, act_rng = jax.random.split(rng, 3)
-    y1 = jax.random.uniform(obs_rng, (128, 1))
+    y1 = jax.random.uniform(obs_rng, (64, 1))
     y2 = jax.random.uniform(obs_rng, (128, 1))
     y = jnp.concatenate([y1, y2], axis=0)
-    U1 = -0.5 - y1[..., None] + 0.1 * jax.random.normal(act_rng, (128, 1, 1))
-    U2 = 0.5 * y1[..., None] + 0.1 * jax.random.normal(act_rng, (128, 1, 1))
+    U1 = -0.5 - y1[..., None] + 0.1 * jax.random.normal(act_rng, (64, 1, 1))
+    U2 = 0.5 * y2[..., None] + 0.1 * jax.random.normal(act_rng, (128, 1, 1))
     U = jnp.concatenate([U1, U2], axis=0)
 
     # Plot the training data
