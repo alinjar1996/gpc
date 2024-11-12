@@ -9,7 +9,7 @@ from hydrax.alg_base import SamplingBasedController
 from tensorboardX import SummaryWriter
 
 from gpc.architectures import ActionSequenceMLP
-from gpc.augmented import PACParams, PredictionAugmentedController
+from gpc.augmented import PACParams, PolicyAugmentedController
 from gpc.envs import SimulatorState, TrainingEnv
 from gpc.policy import Policy
 
@@ -18,7 +18,7 @@ Params = Any
 
 def simulate_episode(
     env: TrainingEnv,
-    ctrl: PredictionAugmentedController,
+    ctrl: PolicyAugmentedController,
     net: ActionSequenceMLP,
     params: Params,
     rng: jax.Array,
@@ -65,7 +65,8 @@ def simulate_episode(
         # best sample.
         costs = jnp.sum(rollouts.costs[0], axis=1)
         best_cost = jnp.min(costs)
-        pred_cost = costs[-1]  # U_pred gets placed at the end of the samples
+        # TODO: this is no longer accurate, since U_pred is not in the samples
+        pred_cost = costs[-1]
 
         # Step the simulation
         x = env.step(x, U_star[0])
@@ -161,6 +162,8 @@ def train(
     env: TrainingEnv,
     ctrl: SamplingBasedController,
     net: ActionSequenceMLP,
+    num_policy_samples: int,
+    policy_noise_level: float,
     log_dir: Union[Path, str],
     num_iters: int,
     num_envs: int,
@@ -174,6 +177,8 @@ def train(
         env: The training environment.
         ctrl: The sampling-based predictive control method to use.
         net: The policy network architecture, maps observation to control tape.
+        num_policy_samples: The number of samples to draw from the policy.
+        policy_noise_level: The standard deviation of the policy noise.
         log_dir: The directory to log TensorBoard data to.
         num_iters: The number of training iterations.
         num_envs: The number of parallel environments to simulate.
@@ -188,7 +193,9 @@ def train(
     rng = jax.random.key(0)
 
     # Set up the sampling-based controller and policy network
-    ctrl = PredictionAugmentedController(ctrl)
+    ctrl = PolicyAugmentedController(
+        ctrl, num_policy_samples, policy_noise_level
+    )
     assert env.task == ctrl.task
 
     # Set up the policy network

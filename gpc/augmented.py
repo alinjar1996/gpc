@@ -19,18 +19,24 @@ class PACParams:
     prediction: jax.Array
 
 
-class PredictionAugmentedController(SamplingBasedController):
-    """An SPC generalization where one sample is replaced by a prediction.
+class PolicyAugmentedController(SamplingBasedController):
+    """An SPC generalization where samples are augmented by a learned policy."""
 
-    This prediction could come from a learned model or a heuristic, and help
-    guide the planner towards more informative samples.
-    """
-
-    def __init__(self, base_ctrl: SamplingBasedController) -> None:
-        """Initialize the prediction-augmented controller.
+    def __init__(
+        self,
+        base_ctrl: SamplingBasedController,
+        num_policy_samples: int,
+        policy_noise_level: int,
+    ) -> None:
+        """Initialize the policy-augmented controller.
 
         Args:
             base_ctrl: The base controller to augment.
+            num_policy_samples: The number of samples to draw from the policy
+                                distribution. For now we assume this is Gaussian
+                                with a fixed variance.
+            policy_noise_level: The standard deviation of iid Gaussian noise to
+                                add to the policy samples.
         """
         self.base_ctrl = base_ctrl
         super().__init__(
@@ -39,6 +45,8 @@ class PredictionAugmentedController(SamplingBasedController):
             base_ctrl.risk_strategy,
             seed=0,
         )
+        self.num_policy_samples = num_policy_samples
+        self.policy_noise_level = policy_noise_level
 
     def init_params(self) -> PACParams:
         """Initialize the controller parameters."""
@@ -47,17 +55,24 @@ class PredictionAugmentedController(SamplingBasedController):
         return PACParams(base_params=base_params, prediction=prediction)
 
     def sample_controls(self, params: PACParams) -> Tuple[jax.Array, PACParams]:
-        """Sample control sequences, overridding one with the prediciton."""
+        """Sample control sequences from the base controller and the policy."""
+        # Samples from the base controller
         samples, base_params = self.base_ctrl.sample_controls(
             params.base_params
         )
 
-        # samples = samples.at[-1].set(params.prediction)
-
+        # Samples from the policy
         rng = base_params.rng
         rng, noise_rng = jax.random.split(rng)
-        noise = jax.random.normal(noise_rng, samples.shape)
-        pred_samples = params.prediction + 0.1 * noise
+        noise = jax.random.normal(
+            noise_rng,
+            (
+                self.num_policy_samples,
+                self.task.planning_horizon,
+                self.task.model.nu,
+            ),
+        )
+        pred_samples = params.prediction + self.policy_noise_level * noise
         samples = jnp.append(pred_samples, samples, axis=0)
         base_params = base_params.replace(rng=rng)
 

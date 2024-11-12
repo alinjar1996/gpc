@@ -15,25 +15,25 @@ if __name__ == "__main__":
         print(usage)
         sys.exit(1)
 
-    env = WalkerEnv(episode_length=100)
+    env = WalkerEnv(episode_length=500)
     save_file = "/tmp/walker_policy.pkl"
 
     if sys.argv[1] == "train":
         # Train the policy and save it to a file
         ctrl = PredictiveSampling(env.task, num_samples=64, noise_level=0.3)
         net = ActionSequenceMLP(
-            [256, 256, 256], env.task.planning_horizon, env.task.model.nu
+            [128, 128], env.task.planning_horizon, env.task.model.nu
         )
         policy = train(
             env,
             ctrl,
             net,
             log_dir="/tmp/gpc_walker",
-            num_iters=10,
-            num_envs=128,
-            batch_size=128,
-            num_epochs=3,
-            learning_rate=3e-4,
+            num_policy_samples=64,
+            policy_noise_level=0.1,
+            num_iters=5,
+            num_envs=16,
+            num_epochs=50,
         )
         policy.save(save_file)
         print(f"Saved policy to {save_file}")

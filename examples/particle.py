@@ -28,6 +28,8 @@ if __name__ == "__main__":
             env,
             ctrl,
             net,
+            num_policy_samples=8,
+            policy_noise_level=0.1,
             log_dir="/tmp/gpc_particle",
             num_iters=10,
             num_envs=128,

@@ -4,7 +4,7 @@ from hydrax.algs import PredictiveSampling
 from hydrax.tasks.particle import Particle
 from mujoco import mjx
 
-from gpc.augmented import PredictionAugmentedController
+from gpc.augmented import PolicyAugmentedController
 
 
 def test_augmented() -> None:
@@ -12,7 +12,9 @@ def test_augmented() -> None:
     # Task and optimizer setup
     task = Particle()
     ps = PredictiveSampling(task, num_samples=32, noise_level=0.1)
-    opt = PredictionAugmentedController(ps)
+    opt = PolicyAugmentedController(
+        ps, num_policy_samples=32, policy_noise_level=0.1
+    )
     jit_opt = jax.jit(opt.optimize)
 
     # Initialize the system state and policy parameters

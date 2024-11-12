@@ -8,7 +8,7 @@ import optax
 from hydrax.algs import PredictiveSampling
 
 from gpc.architectures import ActionSequenceMLP
-from gpc.augmented import PredictionAugmentedController
+from gpc.augmented import PolicyAugmentedController
 from gpc.envs import ParticleEnv
 from gpc.policy import Policy
 from gpc.training import fit_policy, simulate_episode, train
@@ -18,8 +18,10 @@ def test_simulate() -> None:
     """Test simulating an episode."""
     rng = jax.random.key(0)
     env = ParticleEnv(episode_length=13)
-    ctrl = PredictionAugmentedController(
-        PredictiveSampling(env.task, num_samples=8, noise_level=0.1)
+    ctrl = PolicyAugmentedController(
+        PredictiveSampling(env.task, num_samples=8, noise_level=0.1),
+        num_policy_samples=8,
+        policy_noise_level=0.1,
     )
     net = ActionSequenceMLP(
         [32, 32], env.task.planning_horizon, env.task.model.nu
@@ -80,7 +82,16 @@ def test_train() -> None:
     net = ActionSequenceMLP(
         [32, 32], env.task.planning_horizon, env.task.model.nu
     )
-    policy = train(env, ctrl, net, log_dir, num_iters=3, num_envs=128)
+    policy = train(
+        env,
+        ctrl,
+        net,
+        log_dir=log_dir,
+        num_policy_samples=8,
+        policy_noise_level=0.1,
+        num_iters=3,
+        num_envs=128,
+    )
 
     assert isinstance(policy, Policy)
     y = jnp.array([-0.1, 0.1, 0.0, 0.0])
@@ -136,7 +147,7 @@ def test_policy() -> None:
 
 
 if __name__ == "__main__":
-    # test_simulate()
-    # test_fit()
+    test_simulate()
+    test_fit()
     test_train()
-    # test_policy()
+    test_policy()
