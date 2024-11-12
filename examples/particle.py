@@ -2,7 +2,7 @@ import sys
 
 from hydrax.algs import PredictiveSampling
 
-from gpc.architectures import ActionSequenceMLP
+from gpc.architectures import DenoisingMLP
 from gpc.envs import ParticleEnv
 from gpc.policy import Policy
 from gpc.testing import test_interactive
@@ -21,15 +21,12 @@ if __name__ == "__main__":
     if sys.argv[1] == "train":
         # Train the policy and save it to a file
         ctrl = PredictiveSampling(env.task, num_samples=8, noise_level=0.1)
-        net = ActionSequenceMLP(
-            [32, 32], env.task.planning_horizon, env.task.model.nu
-        )
+        net = DenoisingMLP([32, 32])
         policy = train(
             env,
             ctrl,
             net,
             num_policy_samples=8,
-            policy_noise_level=0.1,
             log_dir="/tmp/gpc_particle",
             num_iters=10,
             num_envs=128,
