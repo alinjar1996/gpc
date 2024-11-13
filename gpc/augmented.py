@@ -13,10 +13,12 @@ class PACParams:
     Attributes:
         base_params: The parameters for the base controller.
         policy_samples: Control sequences sampled from the policy.
+        rng: Random number generator key for domain randomization.
     """
 
     base_params: Any
     policy_samples: jax.Array
+    rng: jax.Array
 
 
 class PolicyAugmentedController(SamplingBasedController):
@@ -45,6 +47,8 @@ class PolicyAugmentedController(SamplingBasedController):
     def init_params(self) -> PACParams:
         """Initialize the controller parameters."""
         base_params = self.base_ctrl.init_params()
+        base_rng, our_rng = jax.random.split(base_params.rng)
+        base_params = base_params.replace(rng=base_rng)
         policy_samples = jnp.zeros(
             (
                 self.num_policy_samples,
@@ -52,7 +56,11 @@ class PolicyAugmentedController(SamplingBasedController):
                 self.task.model.nu,
             )
         )
-        return PACParams(base_params=base_params, policy_samples=policy_samples)
+        return PACParams(
+            base_params=base_params,
+            policy_samples=policy_samples,
+            rng=our_rng,
+        )
 
     def sample_controls(self, params: PACParams) -> Tuple[jax.Array, PACParams]:
         """Sample control sequences from the base controller and the policy."""

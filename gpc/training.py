@@ -70,7 +70,7 @@ def simulate_episode(
 
         # Record the lowest costs achieved by SPC and the policy
         # TODO: consider logging something more informative
-        costs = jnp.sum(rollouts.costs[0], axis=1)
+        costs = jnp.sum(rollouts.costs, axis=1)
         spc_best = jnp.min(costs[: -ctrl.num_policy_samples])
         policy_best = jnp.min(costs[ctrl.num_policy_samples :])
 

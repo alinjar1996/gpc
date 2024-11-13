@@ -17,7 +17,7 @@ def test_particle_env() -> None:
     assert jnp.all(state.data.qvel != state2.data.qvel)
     assert jnp.all(state.rng != state2.rng)
 
-    obs = env.get_observation(state)
+    obs = env._get_observation(state)
     assert obs.shape == (4,)
 
     jit_step = jax.jit(env.step)
