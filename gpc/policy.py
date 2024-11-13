@@ -66,9 +66,9 @@ class Policy:
         """
         # TODO: consider warm-starting from prev somehow
         # U = jax.random.normal(rng, prev.shape)
-        start_t = 1.0
+        start_t = 0.1
         U = (1 - start_t) * prev + jax.random.normal(rng, prev.shape) * start_t
-        for t in jnp.arange(0.0, start_t, self.dt):
+        for t in jnp.arange(0.0, 1.0, self.dt):
             v = self.net.apply(self.params, U, y, jnp.array([t]))
             U += self.dt * v
             U = jax.numpy.clip(U, self.u_min, self.u_max)

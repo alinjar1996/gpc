@@ -20,6 +20,9 @@ def test_interactive(env: TrainingEnv, policy: Policy) -> None:
     rng = jax.random.key(0)
     task = env.task
 
+    # DEBUG: use a finer inference step size
+    policy = policy.replace(dt=0.01)
+
     jit_policy = jax.jit(policy.apply)
 
     # Set up the mujoco simultion
