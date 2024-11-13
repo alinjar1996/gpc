@@ -26,9 +26,9 @@ if __name__ == "__main__":
             env,
             ctrl,
             net,
-            num_policy_samples=16,
+            num_policy_samples=32,
             log_dir="/tmp/gpc_pendulum",
-            num_iters=10,
+            num_iters=100,
             num_envs=128,
         )
         policy.save(save_file)
