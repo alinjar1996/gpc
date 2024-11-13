@@ -53,21 +53,33 @@ class Policy:
         with open(path, "rb") as f:
             return pickle.load(f)
 
-    def apply(self, prev: jax.Array, y: jax.Array, rng: jax.Array) -> jax.Array:
+    def apply(
+        self,
+        prev: jax.Array,
+        y: jax.Array,
+        rng: jax.Array,
+        warm_start_level: float = 0.0,
+    ) -> jax.Array:
         """Generate an action sequence conditioned on the observation.
 
         Args:
             prev: The previous action sequence.
             y: The current observation.
             rng: The random number generator key.
+            warm_start_level: The degree of warm-starting to use, in [0, 1].
+
+        A warm-start level of 0.0 means the action sequence is generated from
+        scratch, with the seed for flow matching drawn from a random normal
+        distribution. A warm-start level of 1.0 means the seed is the previous
+        action sequence. Values in between interpolate between these two, with
+        larger values giving smoother but less exploratory action sequences.
 
         Returns:
             The updated action sequence
         """
-        # TODO: consider warm-starting from prev somehow
-        # U = jax.random.normal(rng, prev.shape)
-        start_t = 0.1
-        U = (1 - start_t) * prev + jax.random.normal(rng, prev.shape) * start_t
+        warm_start_level = jnp.clip(warm_start_level, 0.0, 1.0)
+        noise = jax.random.normal(rng, prev.shape)
+        U = warm_start_level * prev + (1 - warm_start_level) * noise
         for t in jnp.arange(0.0, 1.0, self.dt):
             v = self.net.apply(self.params, U, y, jnp.array([t]))
             U += self.dt * v

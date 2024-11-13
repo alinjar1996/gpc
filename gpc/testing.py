@@ -1,4 +1,5 @@
 import time
+from functools import partial
 
 import jax
 import jax.numpy as jnp
@@ -20,10 +21,8 @@ def test_interactive(env: TrainingEnv, policy: Policy) -> None:
     rng = jax.random.key(0)
     task = env.task
 
-    # DEBUG: use a finer inference step size
-    policy = policy.replace(dt=0.01)
-
-    jit_policy = jax.jit(policy.apply)
+    # Set up the policy, choosing the warm start level
+    jit_policy = jax.jit(partial(policy.apply, warm_start_level=0.9))
 
     # Set up the mujoco simultion
     mj_model = task.mj_model
@@ -42,7 +41,6 @@ def test_interactive(env: TrainingEnv, policy: Policy) -> None:
         return task.get_obs(mjx_data)
 
     # Run the simulation
-    i = 0
     with mujoco.viewer.launch_passive(mj_model, mj_data) as viewer:
         while viewer.is_running():
             st = time.time()
@@ -59,24 +57,11 @@ def test_interactive(env: TrainingEnv, policy: Policy) -> None:
             # Update the action sequence
             inference_start = time.time()
             rng, policy_rng = jax.random.split(rng)
-
             actions = jit_policy(actions, obs, policy_rng)
             mj_data.ctrl[:] = actions[0]
 
-            # if i % 40 == 0:
-            #     actions = jit_policy(actions, obs, policy_rng)
-            #     i = 0
-            # if i < 15:
-            #     mj_data.ctrl[:] = actions[0]
-            # elif i < 30:
-            #     mj_data.ctrl[:] = actions[1]
-            # else:
-            #     mj_data.ctrl[:] = actions[2]
-
-            i += 1
-
-            obs_time = inference_start - st
             inference_time = time.time() - inference_start
+            obs_time = inference_start - st
             print(
                 f"  Observation time: {obs_time:.5f}s "
                 f" Inference time: {inference_time:.5f}s",

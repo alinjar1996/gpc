@@ -124,7 +124,7 @@ class PendulumEnv(TrainingEnv):
         """Reset the simulator to start a new episode."""
         rng, pos_rng, vel_rng = jax.random.split(rng, 3)
         qpos = jax.random.uniform(pos_rng, (1,), minval=-0.1, maxval=0.1)
-        qvel = jax.random.uniform(vel_rng, (1,), minval=-0.1, maxval=0.1)
+        qvel = jax.random.uniform(vel_rng, (1,), minval=-8.0, maxval=8.0)
         return data.replace(qpos=qpos, qvel=qvel)
 
     @property

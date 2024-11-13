@@ -323,7 +323,7 @@ def train(
             f"  {i+1}/{num_iters} |"
             f" policy cost {J_policy:.4f} |"
             f" spc cost {J_spc:.4f} |"
-            f" {100 * frac:.2f} % policy is best |"
+            f" {100 * frac:.2f}% policy is best |"
             f" loss {loss:.4f} |"
             f" {time_elapsed} elapsed"
         )
