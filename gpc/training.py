@@ -52,7 +52,7 @@ def simulate_episode(
 
         # Sample action sequences from the learned policy
         # TODO: consider warm-starting the policy
-        y = env.get_observation(x)
+        y = env._get_observation(x)
         rng, policy_rng, explore_rng = jax.random.split(psi.base_params.rng, 3)
         policy_rngs = jax.random.split(policy_rng, ctrl.num_policy_samples)
         U = jnp.zeros((env.task.planning_horizon, env.task.model.nu))
@@ -69,8 +69,7 @@ def simulate_episode(
         U_star = ctrl.get_action_sequence(psi)
 
         # Record the lowest costs achieved by SPC and the policy
-        # TODO: deal with randomizations properly
-        # TODO: consider logging average costs, or something more informative
+        # TODO: consider logging something more informative
         costs = jnp.sum(rollouts.costs[0], axis=1)
         spc_best = jnp.min(costs[: -ctrl.num_policy_samples])
         policy_best = jnp.min(costs[ctrl.num_policy_samples :])

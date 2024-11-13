@@ -45,6 +45,10 @@ class TrainingEnv(ABC):
     def reset(self, data: mjx.Data, rng: jax.Array) -> mjx.Data:
         """Reset the simulator to start a new episode."""
 
+    @abstractmethod
+    def get_obs(self, state: mjx.Data) -> jax.Array:
+        """Get the observation from the simulator state."""
+
     @property
     @abstractmethod
     def observation_size(self) -> int:
@@ -56,10 +60,9 @@ class TrainingEnv(ABC):
         data = self.reset(state.data, reset_rng)
         return SimulatorState(data=data, t=0, rng=rng)
 
-    def get_observation(self, state: SimulatorState) -> jax.Array:
+    def _get_observation(self, state: SimulatorState) -> jax.Array:
         """Get the observation from the simulator state."""
-        # TODO: consider using an abstract class rather than task.get_obs
-        return self.task.get_obs(state.data)
+        return self.get_obs(state.data)
 
     def episode_over(self, state: SimulatorState) -> bool:
         """Check if the episode is over.
@@ -105,6 +108,14 @@ class ParticleEnv(TrainingEnv):
         mocap_pos = data.mocap_pos.at[0, 0:2].set(target)
         return data.replace(qpos=qpos, qvel=qvel, mocap_pos=mocap_pos)
 
+    def get_obs(self, data: mjx.Data) -> jax.Array:
+        """Observe the position relative to the target and the velocity."""
+        pos = (
+            data.site_xpos[self.task.pointmass_id, 0:2] - data.mocap_pos[0, 0:2]
+        )
+        vel = data.qvel[:]
+        return jnp.concatenate([pos, vel])
+
     @property
     def observation_size(self) -> int:
         """The size of the observation space."""
@@ -126,6 +137,12 @@ class PendulumEnv(TrainingEnv):
         qpos = jax.random.uniform(pos_rng, (1,), minval=-0.1, maxval=0.1)
         qvel = jax.random.uniform(vel_rng, (1,), minval=-8.0, maxval=8.0)
         return data.replace(qpos=qpos, qvel=qvel)
+
+    def get_obs(self, data: mjx.Data) -> jax.Array:
+        """Observe the velocity and sin/cos of the angle."""
+        theta = data.qpos[0]
+        theta_dot = data.qvel[0]
+        return jnp.array([jnp.cos(theta), jnp.sin(theta), theta_dot])
 
     @property
     def observation_size(self) -> int:
@@ -150,6 +167,14 @@ class CartPoleEnv(TrainingEnv):
         qpos = jnp.array([pos, theta])
 
         return data.replace(qpos=qpos, qvel=qvel)
+
+    def get_obs(self, data: mjx.Data) -> jax.Array:
+        """Observe the velocity and sin/cos of the angle."""
+        p = data.qpos[0]
+        theta = data.qpos[1]
+        v = data.qvel[0]
+        theta_dot = data.qvel[1]
+        return jnp.array([p, jnp.cos(theta), jnp.sin(theta), v, theta_dot])
 
     @property
     def observation_size(self) -> int:
@@ -177,6 +202,10 @@ class WalkerEnv(TrainingEnv):
         qvel = jax.random.uniform(vel_rng, (9,), minval=-0.1, maxval=0.1)
 
         return data.replace(qpos=qpos, qvel=qvel)
+
+    def get_obs(self, data: mjx.Data) -> jax.Array:
+        """Observe everything in the state except the horizontal position."""
+        return jnp.concatenate([jnp.delete(data.qpos, 1), data.qvel])
 
     @property
     def observation_size(self) -> int:

@@ -38,7 +38,7 @@ def test_interactive(env: TrainingEnv, policy: Policy) -> None:
     def get_obs(mjx_data: mjx.Data) -> jax.Array:
         """Get an observation from the mujoco data."""
         mjx_data = mjx.forward(task.model, mjx_data)  # update sites & sensors
-        return task.get_obs(mjx_data)
+        return env.get_obs(mjx_data)
 
     # Run the simulation
     with mujoco.viewer.launch_passive(mj_model, mj_data) as viewer:
