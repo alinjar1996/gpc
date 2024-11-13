@@ -65,9 +65,10 @@ class Policy:
             The updated action sequence
         """
         # TODO: consider warm-starting from prev somehow
-        U = jax.random.normal(rng, prev.shape)
-        # U = 0.9 * prev + jax.random.normal(rng, prev.shape) * 0.1
-        for t in jnp.arange(0.0, 1.0, self.dt):
+        # U = jax.random.normal(rng, prev.shape)
+        start_t = 1.0
+        U = (1 - start_t) * prev + jax.random.normal(rng, prev.shape) * start_t
+        for t in jnp.arange(0.0, start_t, self.dt):
             v = self.net.apply(self.params, U, y, jnp.array([t]))
             U += self.dt * v
             U = jax.numpy.clip(U, self.u_min, self.u_max)

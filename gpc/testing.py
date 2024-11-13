@@ -19,6 +19,10 @@ def test_interactive(env: TrainingEnv, policy: Policy) -> None:
     """
     rng = jax.random.key(0)
     task = env.task
+
+    # DEBUG
+    policy = policy.replace(dt=0.01)
+
     jit_policy = jax.jit(policy.apply)
 
     # Set up the mujoco simultion
@@ -56,18 +60,18 @@ def test_interactive(env: TrainingEnv, policy: Policy) -> None:
             inference_start = time.time()
             rng, policy_rng = jax.random.split(rng)
 
-            # actions = jit_policy(actions, obs, policy_rng)
-            # mj_data.ctrl[:] = actions[0]
+            actions = jit_policy(actions, obs, policy_rng)
+            mj_data.ctrl[:] = actions[0]
 
-            if i % 30 == 0:
-                actions = jit_policy(actions, obs, policy_rng)
-                i = 0
-            if i < 15:
-                mj_data.ctrl[:] = actions[0]
-            elif i < 30:
-                mj_data.ctrl[:] = actions[1]
-            else:
-                mj_data.ctrl[:] = actions[2]
+            # if i % 40 == 0:
+            #     actions = jit_policy(actions, obs, policy_rng)
+            #     i = 0
+            # if i < 15:
+            #     mj_data.ctrl[:] = actions[0]
+            # elif i < 30:
+            #     mj_data.ctrl[:] = actions[1]
+            # else:
+            #     mj_data.ctrl[:] = actions[2]
 
             i += 1
 

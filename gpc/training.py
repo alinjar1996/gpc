@@ -75,7 +75,7 @@ def simulate_episode(
         policy_best = jnp.min(costs[ctrl.num_policy_samples :])
 
         # Step the simulation
-        exploration_noise = 0.05 * jax.random.normal(
+        exploration_noise = 0.0 * jax.random.normal(
             explore_rng, U_star[0].shape
         )
         x = env.step(x, U_star[0] + exploration_noise)
