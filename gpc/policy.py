@@ -2,29 +2,34 @@ import pickle
 from pathlib import Path
 from typing import Any, Union
 
-import flax.linen as nn
 import jax
+import jax.numpy as jnp
+from flax.struct import dataclass
+
+from gpc.architectures import DenoisingMLP
 
 
+@dataclass
 class Policy:
-    """A pickle-able Generative Predictive Control policy."""
+    """A pickle-able Generative Predictive Control policy.
 
-    def __init__(
-        self, net: nn.Module, params: Any, u_min: jax.Array, u_max: jax.Array
-    ):
-        """Create a new GPC policy.
+    Generates action sequences using flow matching, conditioned on the latest
+    observation.
 
-        Args:
-            net: The network that maps action sequence and observation to a new
-                 action sequence.
-            params: The parameters of the network.
-            u_min: The minimum action values.
-            u_max: The maximum action values.
-        """
-        self.net = net
-        self.params = params
-        self.u_min = u_min
-        self.u_max = u_max
+    Attributes:
+        net: The flow matching network that generates the action sequence.
+        params: The parameters of the network.
+        u_min: The minimum action values.
+        u_max: The maximum action values.
+        dt: The integration step size for flow matching.
+
+    """
+
+    net: DenoisingMLP
+    params: Any
+    u_min: jax.Array
+    u_max: jax.Array
+    dt: float = 0.1
 
     def save(self, path: Union[Path, str]) -> None:
         """Save the policy to a file.
@@ -48,15 +53,36 @@ class Policy:
         with open(path, "rb") as f:
             return pickle.load(f)
 
-    def apply(self, y: jax.Array) -> jax.Array:
-        """Apply the policy, generating an action sequence.
+    def apply(
+        self,
+        prev: jax.Array,
+        y: jax.Array,
+        rng: jax.Array,
+        warm_start_level: float = 0.0,
+    ) -> jax.Array:
+        """Generate an action sequence conditioned on the observation.
 
         Args:
-            u: The current action sequence.
+            prev: The previous action sequence.
             y: The current observation.
+            rng: The random number generator key.
+            warm_start_level: The degree of warm-starting to use, in [0, 1].
+
+        A warm-start level of 0.0 means the action sequence is generated from
+        scratch, with the seed for flow matching drawn from a random normal
+        distribution. A warm-start level of 1.0 means the seed is the previous
+        action sequence. Values in between interpolate between these two, with
+        larger values giving smoother but less exploratory action sequences.
 
         Returns:
             The updated action sequence
         """
-        u_new = self.net.apply(self.params, y)
-        return jax.numpy.clip(u_new, self.u_min, self.u_max)
+        warm_start_level = jnp.clip(warm_start_level, 0.0, 1.0)
+        noise = jax.random.normal(rng, prev.shape)
+        U = warm_start_level * prev + (1 - warm_start_level) * noise
+        for t in jnp.arange(0.0, 1.0, self.dt):
+            v = self.net.apply(self.params, U, y, jnp.array([t]))
+            U += self.dt * v
+            U = jax.numpy.clip(U, self.u_min, self.u_max)
+
+        return U

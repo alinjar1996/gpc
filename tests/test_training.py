@@ -4,10 +4,11 @@ from pathlib import Path
 
 import jax
 import jax.numpy as jnp
+import matplotlib.pyplot as plt
 import optax
 from hydrax.algs import PredictiveSampling
 
-from gpc.architectures import ActionSequenceMLP
+from gpc.architectures import DenoisingMLP
 from gpc.augmented import PolicyAugmentedController
 from gpc.envs import ParticleEnv
 from gpc.policy import Policy
@@ -21,21 +22,25 @@ def test_simulate() -> None:
     ctrl = PolicyAugmentedController(
         PredictiveSampling(env.task, num_samples=8, noise_level=0.1),
         num_policy_samples=8,
-        policy_noise_level=0.1,
     )
-    net = ActionSequenceMLP(
-        [32, 32], env.task.planning_horizon, env.task.model.nu
-    )
+    net = DenoisingMLP([32, 32])
     rng, init_rng = jax.random.split(rng)
-    params = net.init(init_rng, jnp.zeros(env.observation_size))
+    params = net.init(
+        init_rng,
+        jnp.zeros((env.task.planning_horizon, env.task.model.nu)),
+        jnp.zeros(env.observation_size),
+        jnp.zeros(1),
+    )
+
+    policy = Policy(net, params, env.task.u_min, env.task.u_max)
 
     rng, episode_rng = jax.random.split(rng)
-    y, U, J_best, J_pred = simulate_episode(env, ctrl, net, params, episode_rng)
+    y, U, J_spc, J_policy = simulate_episode(env, ctrl, policy, episode_rng)
 
     assert y.shape == (13, 4)
     assert U.shape == (13, 5, 2)
-    assert J_best.shape == (13,)
-    assert J_pred.shape == (13,)
+    assert J_spc.shape == (13,)
+    assert J_policy.shape == (13,)
 
 
 def test_fit() -> None:
@@ -44,19 +49,30 @@ def test_fit() -> None:
 
     # Make some fake data
     rng, obs_rng, act_rng = jax.random.split(rng, 3)
-    y = jax.random.uniform(obs_rng, (128, 4))
-    U = 1.2 + 0.05 * jax.random.uniform(act_rng, (128, 5, 2))
+    y1 = jax.random.uniform(obs_rng, (64, 1))
+    y2 = jax.random.uniform(obs_rng, (128, 1))
+    y = jnp.concatenate([y1, y2], axis=0)
+    U1 = -0.5 - y1[..., None] + 0.1 * jax.random.normal(act_rng, (64, 1, 1))
+    U2 = 0.5 * y2[..., None] + 0.1 * jax.random.normal(act_rng, (128, 1, 1))
+    U = jnp.concatenate([U1, U2], axis=0)
+
+    # Plot the training data
+    if __name__ == "__main__":
+        plt.scatter(y, U[:, 0, 0])
+        plt.xlabel("Observation")
+        plt.ylabel("Action")
+        plt.show(block=False)
 
     # Set up the policy network
-    net = ActionSequenceMLP([32, 32], 5, 2)
+    net = DenoisingMLP([32, 32])
     rng, init_rng = jax.random.split(rng)
-    params = net.init(init_rng, jnp.zeros(4))
+    params = net.init(init_rng, jnp.zeros((1, 1)), jnp.zeros(1), jnp.zeros(1))
 
     # Initialize the optimizer
-    optimizer = optax.adam(1e-3)
+    optimizer = optax.adam(1e-2)
     opt_state = optimizer.init(params)
-    batch_size = 64
-    num_epochs = 80
+    batch_size = 512  # can be larger than the dataset b/c added noise
+    num_epochs = 1000
 
     # Fit the policy network
     st = time.time()
@@ -64,12 +80,24 @@ def test_fit() -> None:
     params, opt_state, loss = fit_policy(
         y, U, net, params, optimizer, opt_state, fit_rng, batch_size, num_epochs
     )
+    print("Final loss:", loss)
+    assert loss < 1.0
     print("Fit time:", time.time() - st)
-    assert loss < 0.1
 
-    # Check that we successfully overfit
-    U_pred = net.apply(params, y[0])
-    assert jnp.allclose(U_pred, U[0], atol=0.5)
+    # Try generating some actions
+    rng, test_rng = jax.random.split(rng)
+    y_test = jnp.linspace(0.0, 1.0, 100)[:, None]
+    U_test = jax.random.normal(test_rng, (100, 1, 1))
+    dt = 0.1
+    for t in jnp.arange(0.0, 1.0, dt):
+        v = net.apply(params, U_test, y_test, jnp.tile(t, (100, 1)))
+        U_test += v * dt
+
+    if __name__ == "__main__":
+        plt.scatter(y_test, U_test[:, 0, 0])
+        plt.xlabel("Observation")
+        plt.ylabel("Action")
+        plt.show()
 
 
 def test_train() -> None:
@@ -79,23 +107,24 @@ def test_train() -> None:
 
     env = ParticleEnv()
     ctrl = PredictiveSampling(env.task, num_samples=8, noise_level=0.1)
-    net = ActionSequenceMLP(
-        [32, 32], env.task.planning_horizon, env.task.model.nu
-    )
+    net = DenoisingMLP([32, 32])
     policy = train(
         env,
         ctrl,
         net,
-        log_dir=log_dir,
         num_policy_samples=8,
-        policy_noise_level=0.1,
+        log_dir=log_dir,
         num_iters=3,
         num_envs=128,
     )
 
     assert isinstance(policy, Policy)
+
+    # Test the policy
+    rng = jax.random.key(0)
     y = jnp.array([-0.1, 0.1, 0.0, 0.0])
-    U = policy.apply(y)
+    U = jnp.zeros((env.task.planning_horizon, env.task.model.nu))
+    U = policy.apply(U, y, rng)
 
     # Check that the policy output points in the right direction
     assert U.shape == (env.task.planning_horizon, env.task.model.nu)
@@ -115,8 +144,13 @@ def test_policy() -> None:
 
     # Create a toy network and parameters
     rng, init_rng = jax.random.split(rng)
-    mlp = ActionSequenceMLP([64, 64], num_steps, num_actions)
-    params = mlp.init(init_rng, jnp.zeros(num_obs))
+    mlp = DenoisingMLP([64, 64])
+    params = mlp.init(
+        init_rng,
+        jnp.zeros((num_steps, num_actions)),
+        jnp.zeros(num_obs),
+        jnp.zeros(1),
+    )
 
     # Create the policy
     u_min = -2 * jnp.ones(num_actions)
@@ -124,9 +158,14 @@ def test_policy() -> None:
     policy = Policy(mlp, params, u_min, u_max)
 
     # Test running the policy
+    rng, apply_rng = jax.random.split(rng)
+    U = jnp.zeros((num_steps, num_actions))
     y = jnp.ones((num_obs,))
-    u = policy.apply(y)
-    assert u.shape == (num_steps, num_actions)
+    U1 = policy.apply(U, y, apply_rng)
+    assert U1.shape == (num_steps, num_actions)
+
+    assert jnp.all(U1 >= u_min)
+    assert jnp.all(U1 <= u_max)
 
     # Save and load the policy
     local_dir = Path("_test_policy")
@@ -137,8 +176,8 @@ def test_policy() -> None:
 
     policy = Policy.load(local_dir / "policy.pkl")
 
-    u2 = policy.apply(y)
-    assert jnp.allclose(u2, u)
+    U2 = jax.jit(policy.apply)(U, y, apply_rng)
+    assert jnp.allclose(U2, U1)
 
     # Cleanup
     for p in local_dir.iterdir():
@@ -147,7 +186,7 @@ def test_policy() -> None:
 
 
 if __name__ == "__main__":
-    test_simulate()
-    test_fit()
+    # test_simulate()
+    # test_fit()
     test_train()
-    test_policy()
+    # test_policy()

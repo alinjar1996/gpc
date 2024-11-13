@@ -1,4 +1,5 @@
 import time
+from functools import partial
 
 import jax
 import jax.numpy as jnp
@@ -17,8 +18,11 @@ def test_interactive(env: TrainingEnv, policy: Policy) -> None:
         env: The environment, which defines the system to simulate.
         policy: The GPC policy to test.
     """
+    rng = jax.random.key(0)
     task = env.task
-    jit_policy = jax.jit(policy.apply)
+
+    # Set up the policy, choosing the warm start level
+    jit_policy = jax.jit(partial(policy.apply, warm_start_level=0.9))
 
     # Set up the mujoco simultion
     mj_model = task.mj_model
@@ -52,11 +56,12 @@ def test_interactive(env: TrainingEnv, policy: Policy) -> None:
 
             # Update the action sequence
             inference_start = time.time()
-            actions = jit_policy(obs)
+            rng, policy_rng = jax.random.split(rng)
+            actions = jit_policy(actions, obs, policy_rng)
             mj_data.ctrl[:] = actions[0]
 
-            obs_time = inference_start - st
             inference_time = time.time() - inference_start
+            obs_time = inference_start - st
             print(
                 f"  Observation time: {obs_time:.5f}s "
                 f" Inference time: {inference_time:.5f}s",

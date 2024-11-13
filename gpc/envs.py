@@ -124,7 +124,7 @@ class PendulumEnv(TrainingEnv):
         """Reset the simulator to start a new episode."""
         rng, pos_rng, vel_rng = jax.random.split(rng, 3)
         qpos = jax.random.uniform(pos_rng, (1,), minval=-0.1, maxval=0.1)
-        qvel = jax.random.uniform(vel_rng, (1,), minval=-0.1, maxval=0.1)
+        qvel = jax.random.uniform(vel_rng, (1,), minval=-8.0, maxval=8.0)
         return data.replace(qpos=qpos, qvel=qvel)
 
     @property
@@ -167,8 +167,15 @@ class WalkerEnv(TrainingEnv):
     def reset(self, data: mjx.Data, rng: jax.Array) -> mjx.Data:
         """Reset the simulator to start a new episode."""
         rng, pos_rng, vel_rng = jax.random.split(rng, 3)
-        qpos = jax.random.uniform(pos_rng, (9,), minval=-0.1, maxval=0.1)
-        qvel = jax.random.uniform(vel_rng, (9,), minval=-5.0, maxval=5.0)
+
+        # Joint limits are zero for the floating base
+        q_min = self.task.model.jnt_range[:, 0]
+        q_max = self.task.model.jnt_range[:, 1]
+        q_min = q_min.at[2].set(-1.5)  # orientation
+        q_max = q_max.at[2].set(1.5)
+        qpos = jax.random.uniform(pos_rng, (9,), minval=q_min, maxval=q_max)
+        qvel = jax.random.uniform(vel_rng, (9,), minval=-0.1, maxval=0.1)
+
         return data.replace(qpos=qpos, qvel=qvel)
 
     @property

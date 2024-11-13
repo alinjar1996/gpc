@@ -12,9 +12,7 @@ def test_augmented() -> None:
     # Task and optimizer setup
     task = Particle()
     ps = PredictiveSampling(task, num_samples=32, noise_level=0.1)
-    opt = PolicyAugmentedController(
-        ps, num_policy_samples=32, policy_noise_level=0.1
-    )
+    opt = PolicyAugmentedController(ps, num_policy_samples=32)
     jit_opt = jax.jit(opt.optimize)
 
     # Initialize the system state and policy parameters
@@ -24,7 +22,7 @@ def test_augmented() -> None:
     )
     params = opt.init_params()
     params = params.replace(
-        prediction=jnp.ones((task.planning_horizon, task.model.nu))
+        policy_samples=jnp.ones((32, task.planning_horizon, task.model.nu))
     )
 
     for _ in range(10):
@@ -39,7 +37,7 @@ def test_augmented() -> None:
 
     assert jnp.linalg.norm(best_obs[-1, 0:2]) < 0.01
     assert jnp.all(best_ctrl != 0.0)
-    assert jnp.all(params.prediction == 1.0)
+    assert jnp.all(params.policy_samples == 1.0)
 
     U = opt.get_action_sequence(params)
     assert jnp.allclose(U, params.base_params.mean)
