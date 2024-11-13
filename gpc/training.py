@@ -52,7 +52,7 @@ def simulate_episode(
         # Sample action sequences from the learned policy
         # TODO: consider warm-starting the policy
         y = env.get_observation(x)
-        rng, policy_rng = jax.random.split(psi.base_params.rng)
+        rng, policy_rng, explore_rng = jax.random.split(psi.base_params.rng, 3)
         policy_rngs = jax.random.split(policy_rng, ctrl.num_policy_samples)
         U = jnp.zeros((env.task.planning_horizon, env.task.model.nu))
         Us = jax.vmap(policy.apply, in_axes=(None, None, 0))(U, y, policy_rngs)
@@ -75,7 +75,10 @@ def simulate_episode(
         policy_best = jnp.min(costs[ctrl.num_policy_samples :])
 
         # Step the simulation
-        x = env.step(x, U_star[0])
+        exploration_noise = 0.05 * jax.random.normal(
+            explore_rng, U_star[0].shape
+        )
+        x = env.step(x, U_star[0] + exploration_noise)
 
         return (x, psi), (y, U_star, spc_best, policy_best)
 

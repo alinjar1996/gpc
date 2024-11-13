@@ -174,7 +174,7 @@ class WalkerEnv(TrainingEnv):
         q_min = q_min.at[2].set(-1.5)  # orientation
         q_max = q_max.at[2].set(1.5)
         qpos = jax.random.uniform(pos_rng, (9,), minval=q_min, maxval=q_max)
-        qvel = jax.random.uniform(vel_rng, (9,), minval=-1.0, maxval=1.0)
+        qvel = jax.random.uniform(vel_rng, (9,), minval=-0.1, maxval=0.1)
 
         return data.replace(qpos=qpos, qvel=qvel)
 

@@ -15,38 +15,8 @@ if __name__ == "__main__":
         print(usage)
         sys.exit(1)
 
-    env = WalkerEnv(episode_length=200)
+    env = WalkerEnv(episode_length=500)
     save_file = "/tmp/walker_policy.pkl"
-
-    # DEBUG
-    import time
-
-    import jax
-    import mujoco
-    import mujoco.viewer
-    from mujoco import mjx
-
-    data = mjx.make_data(env.task.model)
-
-    mj_model = env.task.mj_model
-    mj_data = mujoco.MjData(mj_model)
-
-    rng = jax.random.key(0)
-    with mujoco.viewer.launch_passive(mj_model, mj_data) as viewer:
-        while viewer.is_running():
-            rng, reset_rng = jax.random.split(rng)
-            data = env.reset(data, reset_rng)
-            print("reset!")
-
-            mj_data.qpos = data.qpos
-            mj_data.qvel = data.qvel
-            mujoco.mj_forward(mj_model, mj_data)
-            viewer.sync()
-
-            time.sleep(1.0)
-
-    print(data.qpos)
-    breakpoint()
 
     if sys.argv[1] == "train":
         # Train the policy and save it to a file
@@ -58,9 +28,9 @@ if __name__ == "__main__":
             net,
             log_dir="/tmp/gpc_walker",
             num_policy_samples=16,
-            num_iters=10,
-            num_envs=128,
-            num_epochs=50,
+            num_iters=100,
+            num_envs=32,
+            num_epochs=10,
         )
         policy.save(save_file)
         print(f"Saved policy to {save_file}")
