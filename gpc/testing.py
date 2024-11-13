@@ -38,7 +38,6 @@ def test_interactive(env: TrainingEnv, policy: Policy) -> None:
         return task.get_obs(mjx_data)
 
     # Run the simulation
-    i = 0
     with mujoco.viewer.launch_passive(mj_model, mj_data) as viewer:
         while viewer.is_running():
             st = time.time()
@@ -56,15 +55,8 @@ def test_interactive(env: TrainingEnv, policy: Policy) -> None:
             inference_start = time.time()
             rng, policy_rng = jax.random.split(rng)
 
-            if i % 20 == 0:
-                actions = jit_policy(actions, obs, policy_rng)
-                i = 1  # reset
-            if i < 15:
-                mj_data.ctrl[:] = actions[0]
-            elif i < 30:
-                mj_data.ctrl[:] = actions[1]
-            else:
-                mj_data.ctrl[:] = actions[2]
+            actions = jit_policy(actions, obs, policy_rng)
+            mj_data.ctrl[:] = actions[0]
 
             obs_time = inference_start - st
             inference_time = time.time() - inference_start
@@ -80,8 +72,6 @@ def test_interactive(env: TrainingEnv, policy: Policy) -> None:
             elapsed = time.time() - st
             if elapsed < mj_model.opt.timestep:
                 time.sleep(mj_model.opt.timestep - elapsed)
-
-            i += 1
 
     # Save what was last in the print buffer
     print("")
