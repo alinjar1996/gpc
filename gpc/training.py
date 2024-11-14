@@ -197,6 +197,7 @@ def train(
     learning_rate: float = 1e-3,
     batch_size: int = 128,
     num_epochs: int = 10,
+    checkpoint_every: int = 10,
 ) -> None:
     """Train a generative predictive controller.
 
@@ -211,6 +212,7 @@ def train(
         learning_rate: The learning rate for the policy network.
         batch_size: The batch size for training the policy network.
         num_epochs: The number of epochs to train the policy network.
+        checkpoint_every: Number of iterations between policy checkpoint saves.
 
     Note that the total number of parallel simulations is
         `num_envs * ctrl.num_samples * ctrl.num_randomizations`
@@ -314,7 +316,11 @@ def train(
 
         # TODO: run some evaluation tests
 
-        # TODO: save checkpoints
+        # Save a policy checkpoint
+        if i % checkpoint_every == 0:
+            ckpt_path = log_dir / f"policy_ckpt_{i}.pkl"
+            policy.replace(params=params).save(ckpt_path)
+            print(f"Saved policy checkpoint to {ckpt_path}")
 
         # Print a performance summary
         time_elapsed = datetime.now() - train_start
