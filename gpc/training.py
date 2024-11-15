@@ -21,6 +21,7 @@ def simulate_episode(
     env: TrainingEnv,
     ctrl: PolicyAugmentedController,
     policy: Policy,
+    exploration_noise_level: float,
     rng: jax.Array,
 ) -> Tuple[jax.Array, jax.Array, jax.Array, jax.Array]:
     """Starting from a random initial state, run SPC and record training data.
@@ -29,6 +30,8 @@ def simulate_episode(
         env: The training environment.
         ctrl: The sampling-based controller (augmented with a learned policy).
         policy: The generative policy network.
+        exploration_noise_level: Standard deviation of the gaussian noise added
+                                 to each action.
         rng: The random number generator key.
 
     Returns:
@@ -75,7 +78,7 @@ def simulate_episode(
         policy_best = jnp.min(costs[ctrl.num_policy_samples :])
 
         # Step the simulation
-        exploration_noise = 0.0 * jax.random.normal(
+        exploration_noise = exploration_noise_level * jax.random.normal(
             explore_rng, U_star[0].shape
         )
         x = env.step(x, U_star[0] + exploration_noise)
@@ -198,6 +201,7 @@ def train(  # noqa: PLR0915 this is a long function, don't limit to 50 lines
     batch_size: int = 128,
     num_epochs: int = 10,
     checkpoint_every: int = 10,
+    exploration_noise_level: float = 0.0,
 ) -> None:
     """Train a generative predictive controller.
 
@@ -213,6 +217,8 @@ def train(  # noqa: PLR0915 this is a long function, don't limit to 50 lines
         batch_size: The batch size for training the policy network.
         num_epochs: The number of epochs to train the policy network.
         checkpoint_every: Number of iterations between policy checkpoint saves.
+        exploration_noise_level: Standard deviation of the gaussian noise added
+                                 to each action during episode simulation.
 
     """
     rng = jax.random.key(0)
@@ -284,8 +290,8 @@ def train(  # noqa: PLR0915 this is a long function, don't limit to 50 lines
         my_policy = policy.replace(params=params)
 
         y, U, J_spc, J_policy = jax.vmap(
-            simulate_episode, in_axes=(None, None, None, 0)
-        )(env, ctrl, my_policy, rngs)
+            simulate_episode, in_axes=(None, None, None, None, 0)
+        )(env, ctrl, my_policy, exploration_noise_level, rngs)
 
         frac = jnp.mean(J_policy < J_spc)
         return y, U, jnp.mean(J_spc), jnp.mean(J_policy), frac
