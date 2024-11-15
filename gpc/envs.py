@@ -196,7 +196,7 @@ class DoubleCartPoleEnv(TrainingEnv):
 
         thetas = jax.random.uniform(theta_rng, (2), minval=-3.14, maxval=3.14)
         pos = jax.random.uniform(pos_rng, (), minval=-2.8, maxval=2.8)
-        qvel = jax.random.uniform(vel_rng, (3,), minval=-2.0, maxval=2.0)
+        qvel = jax.random.uniform(vel_rng, (3,), minval=-10.0, maxval=10.0)
         qpos = jnp.array([pos, thetas[0], thetas[1]])
 
         return data.replace(qpos=qpos, qvel=qvel)

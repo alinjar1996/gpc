@@ -20,17 +20,17 @@ if __name__ == "__main__":
 
     if sys.argv[1] == "train":
         # Train the policy and save it to a file
-        ctrl = PredictiveSampling(env.task, num_samples=32, noise_level=0.1)
-        net = DenoisingMLP([64, 64])
+        ctrl = PredictiveSampling(env.task, num_samples=128, noise_level=0.2)
+        net = DenoisingMLP([256, 256, 256])
         policy = train(
             env,
             ctrl,
             net,
             num_policy_samples=16,
             log_dir="/tmp/gpc_double_cart_pole",
-            num_iters=100,
+            num_iters=3,
             num_envs=128,
-            num_epochs=100,
+            num_epochs=10,
         )
         policy.save(save_file)
         print(f"Saved policy to {save_file}")
@@ -39,7 +39,7 @@ if __name__ == "__main__":
         # Load the policy from a file and test it interactively
         print(f"Loading policy from {save_file}")
         policy = Policy.load(save_file)
-        test_interactive(env, policy)
+        test_interactive(env, policy, inference_timestep=0.01)
 
     else:
         print(usage)

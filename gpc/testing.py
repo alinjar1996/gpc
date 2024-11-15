@@ -11,18 +11,28 @@ from gpc.envs import TrainingEnv
 from gpc.policy import Policy
 
 
-def test_interactive(env: TrainingEnv, policy: Policy) -> None:
+def test_interactive(
+    env: TrainingEnv,
+    policy: Policy,
+    inference_timestep: float = 0.1,
+    warm_start_level: float = 0.9,
+) -> None:
     """Test a GPC policy with an interactive simulation.
 
     Args:
         env: The environment, which defines the system to simulate.
         policy: The GPC policy to test.
+        inference_timestep: The timestep dt to use for flow matching inference.
+        warm_start_level: The warm start level to use for the policy.
     """
     rng = jax.random.key(0)
     task = env.task
 
-    # Set up the policy, choosing the warm start level
-    jit_policy = jax.jit(partial(policy.apply, warm_start_level=0.9))
+    # Set up the policy
+    policy = policy.replace(dt=inference_timestep)
+    jit_policy = jax.jit(
+        partial(policy.apply, warm_start_level=warm_start_level)
+    )
 
     # Set up the mujoco simultion
     mj_model = task.mj_model
