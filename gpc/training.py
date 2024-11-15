@@ -186,7 +186,7 @@ def fit_policy(
     return params, opt_state, losses[-1]
 
 
-def train(
+def train(  # noqa: PLR0915 this is a long function, don't limit to 50 lines
     env: TrainingEnv,
     ctrl: SamplingBasedController,
     net: DenoisingMLP,
@@ -214,11 +214,30 @@ def train(
         num_epochs: The number of epochs to train the policy network.
         checkpoint_every: Number of iterations between policy checkpoint saves.
 
-    Note that the total number of parallel simulations is
-        `num_envs * ctrl.num_samples * ctrl.num_randomizations`
-
     """
     rng = jax.random.key(0)
+
+    # Print some information about the training setup
+    episode_seconds = env.episode_length * env.task.model.opt.timestep
+    horizon_seconds = env.task.planning_horizon * env.task.dt
+    num_samples = num_policy_samples + ctrl.num_samples
+    print("Training with:")
+    print(
+        f"  episode length: {episode_seconds} seconds"
+        f" ({env.episode_length} simulation steps)"
+    )
+    (
+        print(
+            f"  planning horizon: {horizon_seconds} seconds"
+            f" ({env.task.planning_horizon} knots)"
+        ),
+    )
+    print(
+        "  Parallel rollouts per simulation step:"
+        f" {num_samples * ctrl.num_randomizations * num_envs}"
+        f" (= {num_samples} x {ctrl.num_randomizations} x {num_envs})"
+    )
+    print("")
 
     # Set up the sampling-based controller and policy network
     ctrl = PolicyAugmentedController(ctrl, num_policy_samples)
@@ -317,7 +336,7 @@ def train(
         # TODO: run some evaluation tests
 
         # Save a policy checkpoint
-        if i % checkpoint_every == 0:
+        if i % checkpoint_every == 0 and i > 0:
             ckpt_path = log_dir / f"policy_ckpt_{i}.pkl"
             policy.replace(params=params).save(ckpt_path)
             print(f"Saved policy checkpoint to {ckpt_path}")
