@@ -135,27 +135,12 @@ def fit_policy(
         return jnp.mean(jnp.square(pred - target))
 
     @nnx.jit
-    def _opt_step(
+    def _train_step(
         model: nnx.Module,
         optimizer: nnx.Optimizer,
-        obs: jax.Array,
-        act: jax.Array,
         rng: jax.Array,
-    ) -> jax.Array:
-        """Perform a gradient descent step on the given batch of data."""
-        # Sample noise and time steps for the flow matching targets
-        rng, noise_rng, t_rng = jax.random.split(rng, 3)
-        noise = jax.random.normal(noise_rng, act.shape)
-        t = jax.random.uniform(t_rng, (obs.shape[:-1] + (1,)))
-
-        # Compute the loss and its gradient
-        loss, grad = nnx.value_and_grad(_loss_fn)(model, obs, act, noise, t)
-        optimizer.update(grad)  # in-place update of model params
-
-        return loss
-
-    def _scan(rng: jax.Array, t: int) -> Tuple:
-        """Inner loop function for the optimizer."""
+    ) -> Tuple[jax.Array, jax.Array]:
+        """Perform a gradient descent step on a batch of data."""
         # Get a random batch of data
         rng, batch_rng = jax.random.split(rng)
         batch_idx = jax.random.randint(
@@ -164,14 +149,29 @@ def fit_policy(
         batch_obs = observations[batch_idx]
         batch_act = action_sequences[batch_idx]
 
-        # Do an optimizer step
-        rng, step_rng = jax.random.split(rng)
-        loss = _opt_step(model, optimizer, batch_obs, batch_act, step_rng)
+        # Sample noise and time steps for the flow matching targets
+        rng, noise_rng, t_rng = jax.random.split(rng, 3)
+        noise = jax.random.normal(noise_rng, batch_act.shape)
+        t = jax.random.uniform(
+            t_rng,
+            (
+                batch_size,
+                1,
+            ),
+        )
+
+        # Compute the loss and its gradient
+        loss, grad = nnx.value_and_grad(_loss_fn)(
+            model, batch_obs, batch_act, noise, t
+        )
+
+        # Update the optimizer and model parameters in-place via flax.nnx
+        optimizer.update(grad)
 
         return rng, loss
 
     for _ in range(num_batches * num_epochs):
-        rng, loss = _scan(rng, 0)
+        rng, loss = _train_step(model, optimizer, rng)
 
     return loss
 
