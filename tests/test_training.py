@@ -6,6 +6,7 @@ import jax
 import jax.numpy as jnp
 import matplotlib.pyplot as plt
 import optax
+from flax import nnx
 from hydrax.algs import PredictiveSampling
 
 from gpc.architectures import DenoisingMLP
@@ -66,33 +67,43 @@ def test_fit() -> None:
         plt.show(block=False)
 
     # Set up the policy network
-    net = DenoisingMLP([32, 32])
-    rng, init_rng = jax.random.split(rng)
-    params = net.init(init_rng, jnp.zeros((1, 1)), jnp.zeros(1), jnp.zeros(1))
+    net = DenoisingMLP(
+        action_size=1,
+        observation_size=1,
+        horizon=1,
+        hidden_layers=[32, 32],
+        rngs=nnx.Rngs(0),
+    )
 
-    # Initialize the optimizer
-    optimizer = optax.adam(1e-2)
-    opt_state = optimizer.init(params)
-    batch_size = 512  # can be larger than the dataset b/c added noise
+    # Set up the optimizer
+    optimizer = nnx.Optimizer(net, optax.adam(1e-2))
+    batch_size = 32  # can be larger than the dataset b/c added noise
     num_epochs = 1000
 
     # Fit the policy network
     st = time.time()
     rng, fit_rng = jax.random.split(rng)
-    params, opt_state, loss = fit_policy(
-        y, U, net, params, optimizer, opt_state, fit_rng, batch_size, num_epochs
-    )
+    loss = fit_policy(y, U, net, optimizer, batch_size, num_epochs, fit_rng)
     print("Final loss:", loss)
     assert loss < 1.0
     print("Fit time:", time.time() - st)
 
+    # Fit the policy network
+    # st = time.time()
+    # rng, fit_rng = jax.random.split(rng)
+    # params, opt_state, loss = fit_policy(
+    # y, U, net, params, optimizer, opt_state, fit_rng, batch_size, num_epochs
+    # )
+    # print("Final loss:", loss)
+    # assert loss < 1.0
+    # print("Fit time:", time.time() - st)
     # Try generating some actions
     rng, test_rng = jax.random.split(rng)
     y_test = jnp.linspace(0.0, 1.0, 100)[:, None]
     U_test = jax.random.normal(test_rng, (100, 1, 1))
     dt = 0.1
     for t in jnp.arange(0.0, 1.0, dt):
-        v = net.apply(params, U_test, y_test, jnp.tile(t, (100, 1)))
+        v = net(U_test, y_test, jnp.tile(t, (100, 1)))
         U_test += v * dt
 
     if __name__ == "__main__":
@@ -189,6 +200,6 @@ def test_policy() -> None:
 
 if __name__ == "__main__":
     # test_simulate()
-    # test_fit()
-    test_train()
+    test_fit()
+    # test_train()
     # test_policy()

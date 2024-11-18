@@ -6,6 +6,7 @@ from typing import Any, Tuple, Union
 import jax
 import jax.numpy as jnp
 import optax
+from flax import nnx
 from hydrax.alg_base import SamplingBasedController
 from tensorboardX import SummaryWriter
 
@@ -93,6 +94,89 @@ def simulate_episode(
 
 
 def fit_policy(
+    observations: jax.Array,
+    action_sequences: jax.Array,
+    model: DenoisingMLP,
+    optimizer: nnx.Optimizer,
+    batch_size: int,
+    num_epochs: int,
+    rng: jax.Array,
+) -> jax.Array:
+    """Fit a flow matching model to the data.
+
+    Args:
+        observations: The observations y.
+        action_sequences: The corresponding target action sequences U.
+        model: The policy network, outputs the flow matching vector field.
+        optimizer: The optimizer (e.g. Adam).
+        batch_size: The batch size.
+        num_epochs: The number of epochs.
+        rng: The random number generator key.
+
+    Returns:
+        The loss from the last epoch.
+
+    Note that model and optimizer are updated in-place by flax.nnx.
+    """
+    num_data_points = observations.shape[0]
+    num_batches = max(1, num_data_points // batch_size)
+
+    def _loss_fn(
+        model: nnx.Module,
+        obs: jax.Array,
+        act: jax.Array,
+        noise: jax.Array,
+        t: jax.Array,
+    ) -> jax.Array:
+        """Compute the flow-matching loss."""
+        noised_action = t[..., None] * act + (1 - t[..., None]) * noise
+        target = act - noise
+        pred = model(noised_action, obs, t)
+        return jnp.mean(jnp.square(pred - target))
+
+    @nnx.jit
+    def _opt_step(
+        model: nnx.Module,
+        optimizer: nnx.Optimizer,
+        obs: jax.Array,
+        act: jax.Array,
+        rng: jax.Array,
+    ) -> jax.Array:
+        """Perform a gradient descent step on the given batch of data."""
+        # Sample noise and time steps for the flow matching targets
+        rng, noise_rng, t_rng = jax.random.split(rng, 3)
+        noise = jax.random.normal(noise_rng, act.shape)
+        t = jax.random.uniform(t_rng, (obs.shape[:-1] + (1,)))
+
+        # Compute the loss and its gradient
+        loss, grad = nnx.value_and_grad(_loss_fn)(model, obs, act, noise, t)
+        optimizer.update(grad)  # in-place update of model params
+
+        return loss
+
+    def _scan(rng: jax.Array, t: int) -> Tuple:
+        """Inner loop function for the optimizer."""
+        # Get a random batch of data
+        rng, batch_rng = jax.random.split(rng)
+        batch_idx = jax.random.randint(
+            batch_rng, (batch_size,), 0, num_data_points
+        )
+        batch_obs = observations[batch_idx]
+        batch_act = action_sequences[batch_idx]
+
+        # Do an optimizer step
+        rng, step_rng = jax.random.split(rng)
+        loss = _opt_step(model, optimizer, batch_obs, batch_act, step_rng)
+
+        return rng, loss
+
+    for _ in range(num_batches * num_epochs):
+        rng, loss = _scan(rng, 0)
+
+    return loss
+
+
+def fit_policy_old(
     observations: jax.Array,
     action_sequences: jax.Array,
     net: DenoisingMLP,
