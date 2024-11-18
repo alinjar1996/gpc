@@ -1,16 +1,10 @@
 import pickle
 from pathlib import Path
 
-import jax
 import jax.numpy as jnp
 from flax import nnx
 
-from gpc.architectures import (
-    MLP,
-    # ActionSequenceMLP,
-    # DenoisingMLP,
-    # print_module_summary,
-)
+from gpc.architectures import MLP, DenoisingMLP
 
 
 def test_mlp_construction() -> None:
@@ -29,26 +23,6 @@ def test_mlp_construction() -> None:
 
     # Print a summary of the model
     nnx.display(model)
-
-    # Check that we can pickle the model
-    local_dir = Path("_test_mlp")
-    local_dir.mkdir(parents=True, exist_ok=True)
-
-    model_path = local_dir / "mlp.pkl"
-    with Path(model_path).open("wb") as f:
-        pickle.dump(model, f)
-
-    with Path(model_path).open("rb") as f:
-        new_model = pickle.load(f)
-
-    new_output = new_model(input)
-    print(new_output, output)
-
-    nnx.display(new_model)
-
-    for p in local_dir.iterdir():
-        p.unlink()
-    local_dir.rmdir()
 
 
 def test_mlp_save_load() -> None:
@@ -88,56 +62,31 @@ def test_mlp_save_load() -> None:
     local_dir.rmdir()
 
 
-def test_action_sequence_mlp() -> None:
-    """Test the trajectory-generation MLP."""
-    num_steps = 5
-    action_dim = 3
-    net = ActionSequenceMLP(
-        hidden_layers=(32, 32), num_steps=num_steps, action_dim=action_dim
-    )
-
-    rng = jax.random.key(0)
-    rng, init_rng = jax.random.split(rng)
-    dummy_input = jnp.ones(7)
-    params = net.init(init_rng, dummy_input)
-
-    U = net.apply(params, jnp.ones(7))
-    assert U.shape == (num_steps, action_dim)
-
-    U = net.apply(params, jnp.ones((14, 24, 7)))
-    assert U.shape == (14, 24, num_steps, action_dim)
-
-
 def test_denoising_mlp() -> None:
     """Test the denoising MLP."""
-    rng = jax.random.key(0)
     num_steps = 5
     action_dim = 3
     obs_dim = 4
 
     # Define the network architecture
-    net = DenoisingMLP(hidden_layers=(32, 32))
+    net = DenoisingMLP(action_dim, obs_dim, num_steps, (32, 32), nnx.Rngs(0))
 
-    # Initialize network parameters
+    # Test on some data
     U = jnp.ones((num_steps, action_dim))
     y = jnp.ones(obs_dim)
     t = jnp.ones(1)
-    params = net.init(rng, U, y, t)
-
-    # Check the output shape
-    U_out = net.apply(params, U, y, t)
+    U_out = net(U, y, t)
     assert U_out.shape == (num_steps, action_dim)
 
-    # Try with a batch of sequences
+    # Test on some batched data
     U = jnp.ones((14, 24, num_steps, action_dim))
     y = jnp.ones((14, 24, obs_dim))
     t = jnp.ones((14, 24, 1))
-    U_out = net.apply(params, U, y, t)
-    assert U_out.shape == U.shape
+    U_out = net(U, y, t)
+    assert U_out.shape == (14, 24, num_steps, action_dim)
 
 
 if __name__ == "__main__":
-    # test_mlp_construction()
+    test_mlp_construction()
     test_mlp_save_load()
-    # test_action_sequence_mlp()
-    # test_denoising_mlp()
+    test_denoising_mlp()
