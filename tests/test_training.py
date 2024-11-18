@@ -35,7 +35,9 @@ def test_simulate() -> None:
     policy = Policy(net, params, env.task.u_min, env.task.u_max)
 
     rng, episode_rng = jax.random.split(rng)
-    y, U, J_spc, J_policy = simulate_episode(env, ctrl, policy, episode_rng)
+    y, U, J_spc, J_policy = simulate_episode(
+        env, ctrl, policy, 0.0, episode_rng
+    )
 
     assert y.shape == (13, 4)
     assert U.shape == (13, 5, 2)
