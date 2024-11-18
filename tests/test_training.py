@@ -146,20 +146,19 @@ def test_policy() -> None:
     num_actions = 2
     num_obs = 3
 
-    # Create a toy network and parameters
-    rng, init_rng = jax.random.split(rng)
-    mlp = DenoisingMLP([64, 64])
-    params = mlp.init(
-        init_rng,
-        jnp.zeros((num_steps, num_actions)),
-        jnp.zeros(num_obs),
-        jnp.zeros(1),
+    # Create a toy network
+    mlp = DenoisingMLP(
+        action_size=num_actions,
+        observation_size=num_obs,
+        horizon=num_steps,
+        hidden_layers=[32, 32],
+        rngs=nnx.Rngs(0),
     )
 
     # Create the policy
     u_min = -2 * jnp.ones(num_actions)
-    u_max = 0.1 * jnp.ones(num_actions)
-    policy = Policy(mlp, params, u_min, u_max)
+    u_max = jnp.ones(num_actions)
+    policy = Policy(mlp, u_min, u_max)
 
     # Test running the policy
     rng, apply_rng = jax.random.split(rng)
@@ -168,6 +167,7 @@ def test_policy() -> None:
     U1 = policy.apply(U, y, apply_rng)
     assert U1.shape == (num_steps, num_actions)
 
+    assert jnp.all(U1 != 0.0)
     assert jnp.all(U1 >= u_min)
     assert jnp.all(U1 <= u_max)
 
@@ -178,9 +178,9 @@ def test_policy() -> None:
     policy.save(local_dir / "policy.pkl")
     del policy
 
-    policy = Policy.load(local_dir / "policy.pkl")
+    policy2 = Policy.load(local_dir / "policy.pkl")
 
-    U2 = jax.jit(policy.apply)(U, y, apply_rng)
+    U2 = jax.jit(policy2.apply)(U, y, apply_rng)
     assert jnp.allclose(U2, U1)
 
     # Cleanup
@@ -191,6 +191,6 @@ def test_policy() -> None:
 
 if __name__ == "__main__":
     # test_simulate()
-    test_fit()
+    # test_fit()
     # test_train()
-    # test_policy()
+    test_policy()

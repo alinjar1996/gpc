@@ -61,6 +61,7 @@ class DenoisingMLP(nnx.Module):
         self.action_size = action_size
         self.observation_size = observation_size
         self.horizon = horizon
+        self.hidden_layers = hidden_layers
 
         input_size = horizon * action_size + observation_size + 1
         output_size = horizon * action_size
