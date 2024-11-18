@@ -24,16 +24,15 @@ def test_simulate() -> None:
         PredictiveSampling(env.task, num_samples=8, noise_level=0.1),
         num_policy_samples=8,
     )
-    net = DenoisingMLP([32, 32])
-    rng, init_rng = jax.random.split(rng)
-    params = net.init(
-        init_rng,
-        jnp.zeros((env.task.planning_horizon, env.task.model.nu)),
-        jnp.zeros(env.observation_size),
-        jnp.zeros(1),
+    net = DenoisingMLP(
+        action_size=env.task.model.nu,
+        observation_size=env.observation_size,
+        horizon=env.task.planning_horizon,
+        hidden_layers=[32, 32],
+        rngs=nnx.Rngs(0),
     )
 
-    policy = Policy(net, params, env.task.u_min, env.task.u_max)
+    policy = Policy(net, env.task.u_min, env.task.u_max)
 
     rng, episode_rng = jax.random.split(rng)
     y, U, J_spc, J_policy = simulate_episode(
@@ -190,7 +189,7 @@ def test_policy() -> None:
 
 
 if __name__ == "__main__":
-    # test_simulate()
-    # test_fit()
+    test_simulate()
+    test_fit()
     # test_train()
     test_policy()
