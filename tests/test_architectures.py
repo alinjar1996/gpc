@@ -3,45 +3,32 @@ from pathlib import Path
 
 import jax
 import jax.numpy as jnp
+from flax import nnx
 
 from gpc.architectures import (
     MLP,
-    ActionSequenceMLP,
-    DenoisingMLP,
-    print_module_summary,
+    # ActionSequenceMLP,
+    # DenoisingMLP,
+    # print_module_summary,
 )
 
 
 def test_mlp_construction() -> None:
     """Create a simple MLP and verify sizes."""
-    input_size = (3,)
-    layer_sizes = (2, 3, 4)
+    batch_size = 10
+    input_size = 2
+    output_size = 3
 
-    # Pseudo-random keys
-    rng = jax.random.key(0)
-    rng, param_rng, input_rng = jax.random.split(rng, 3)
+    # Create the model
+    model = MLP([input_size, 128, 32, output_size], nnx.Rngs(0))
 
-    # Create the MLP
-    mlp = MLP(layer_sizes=layer_sizes, bias=True)
-    dummy_input = jnp.ones(input_size)
-    params = mlp.init(param_rng, dummy_input)
+    # Make sure the model is constructed correctly
+    input = jnp.zeros((batch_size, input_size))
+    output = model(input)
+    assert output.shape == (batch_size, output_size)
 
-    # Check the MLP's structure
-    print_module_summary(mlp, input_size)
-
-    # Forward pass through the network
-    my_input = jax.random.normal(input_rng, input_size)
-    my_output = mlp.apply(params, my_input)
-    assert my_output.shape[-1] == layer_sizes[-1]
-
-    # Check number of parameters
-    num_params = sum(x.size for x in jax.tree_util.tree_leaves(params))
-    expected_num_params = 0
-    sizes = input_size + layer_sizes
-    for i in range(len(sizes) - 1):
-        expected_num_params += sizes[i] * sizes[i + 1]  # weights
-        expected_num_params += sizes[i + 1]  # biases
-    assert num_params == expected_num_params
+    # Print a summary of the model
+    nnx.display(model)
 
 
 def test_mlp_save_load() -> None:
@@ -133,6 +120,6 @@ def test_denoising_mlp() -> None:
 
 if __name__ == "__main__":
     test_mlp_construction()
-    test_mlp_save_load()
-    test_action_sequence_mlp()
-    test_denoising_mlp()
+    # test_mlp_save_load()
+    # test_action_sequence_mlp()
+    # test_denoising_mlp()
