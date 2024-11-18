@@ -16,7 +16,7 @@ class MLP(nnx.Module):
         """
         self.num_hidden = len(layer_sizes) - 2
 
-        # TODO: use nnx.scan and nnx.vmap to reduce compile times
+        # TODO: use nnx.scan to scan over layers, reducing compile times
         for i, (input_size, output_size) in enumerate(
             zip(layer_sizes[:-1], layer_sizes[1:], strict=False)
         ):

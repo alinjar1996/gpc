@@ -30,6 +30,25 @@ def test_mlp_construction() -> None:
     # Print a summary of the model
     nnx.display(model)
 
+    # Check that we can pickle the model
+    local_dir = Path("_test_mlp")
+    local_dir.mkdir(parents=True, exist_ok=True)
+
+    model_path = local_dir / "mlp.pkl"
+    with Path(model_path).open("wb") as f:
+        pickle.dump(model, f)
+
+    with Path(model_path).open("rb") as f:
+        new_model = pickle.load(f)
+
+    new_output = new_model(input)
+    print(new_output, output)
+
+    nnx.display(new_model)
+
+    for p in local_dir.iterdir():
+        p.unlink()
+    local_dir.rmdir()
 
 def test_mlp_save_load() -> None:
     """Verify that we can pickle an MLP."""
