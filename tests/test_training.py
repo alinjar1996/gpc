@@ -195,7 +195,7 @@ def test_policy() -> None:
 
 
 if __name__ == "__main__":
-    # test_simulate()
+    test_simulate()
     test_fit()
-    # test_train()
-    # test_policy()
+    test_train()
+    test_policy()
