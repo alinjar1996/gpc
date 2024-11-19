@@ -152,13 +152,7 @@ def fit_policy(
         # Sample noise and time steps for the flow matching targets
         rng, noise_rng, t_rng = jax.random.split(rng, 3)
         noise = jax.random.normal(noise_rng, batch_act.shape)
-        t = jax.random.uniform(
-            t_rng,
-            (
-                batch_size,
-                1,
-            ),
-        )
+        t = jax.random.uniform(t_rng, (batch_size, 1))
 
         # Compute the loss and its gradient
         loss, grad = nnx.value_and_grad(_loss_fn)(
@@ -258,7 +252,7 @@ def train(  # noqa: PLR0915 this is a long function, don't limit to 50 lines
         """Simulate episodes in parallel.
 
         Args:
-            params: The policy network parameters.
+            policy: The policy network.
             rng: The random number generator key.
 
         Returns:
@@ -270,10 +264,6 @@ def train(  # noqa: PLR0915 this is a long function, don't limit to 50 lines
         """
         rngs = jax.random.split(rng, num_envs)
 
-        # TODO: consider making a policy = policy.set_params(params) method
-        # net = nnx.merge(graphdef, params)
-        # policy = Policy(net, env.task.u_min, env.task.u_max)
-
         y, U, J_spc, J_policy = jax.vmap(
             simulate_episode, in_axes=(None, None, None, None, 0)
         )(env, ctrl, policy, exploration_noise_level, rngs)
@@ -281,31 +271,34 @@ def train(  # noqa: PLR0915 this is a long function, don't limit to 50 lines
         frac = jnp.mean(J_policy < J_spc)
         return y, U, jnp.mean(J_spc), jnp.mean(J_policy), frac
 
-    @jax.jit
+    # @nnx.jit
     def jit_fit(
+        policy: Policy,
+        optimizer: nnx.Optimizer,
         observations: jax.Array,
         actions: jax.Array,
-        net: DenoisingMLP,
-        optimizer: nnx.Optimizer,
         rng: jax.Array,
     ) -> Tuple[DenoisingMLP, nnx.Optimizer, jax.Array]:
         """Fit the policy network to the data.
 
         Args:
+            policy: The policy network (updated in place).
+            optimizer: The optimizer (updated in place).
             observations: The observations.
             actions: The best action sequences.
-            net: The policy network parameters.
-            opt_state: The optimizer state.
             rng: The random number generator key.
 
         Returns:
-            The updated policy network parameters.
-            The updated optimizer state.
             The loss from the last epoch.
         """
+        # Flatten across timesteps and initial conditions
         y = observations.reshape(-1, observations.shape[-1])
         U = actions.reshape(-1, env.task.planning_horizon, env.task.model.nu)
-        return fit_policy(y, U, net, optimizer, batch_size, num_epochs, rng)
+
+        # Do the regression
+        return fit_policy(
+            y, U, policy.model, optimizer, batch_size, num_epochs, rng
+        )
 
     train_start = datetime.now()
     for i in range(num_iters):
@@ -314,14 +307,14 @@ def train(  # noqa: PLR0915 this is a long function, don't limit to 50 lines
         sim_start = time.time()
         rng, episode_rng = jax.random.split(rng)
         y, U, J_spc, J_policy, frac = jit_simulate(policy, episode_rng)
+        y.block_until_ready()
         sim_time = time.time() - sim_start
-
-        breakpoint()
 
         # Fit the policy network U = NNet(y) to the data
         fit_start = time.time()
         rng, fit_rng = jax.random.split(rng)
-        params, opt_state, loss = jit_fit(y, U, params, opt_state, fit_rng)
+        loss = jit_fit(policy, optimizer, y, U, fit_rng)
+        loss.block_until_ready()
         fit_time = time.time() - fit_start
 
         # TODO: run some evaluation tests
@@ -352,4 +345,4 @@ def train(  # noqa: PLR0915 this is a long function, don't limit to 50 lines
         tb_writer.add_scalar("fit/time", fit_time, i)
         tb_writer.flush()
 
-    return policy.replace(params=params)
+    return policy
