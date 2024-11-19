@@ -164,10 +164,21 @@ def fit_policy(
 
         return rng, loss
 
-    for _ in range(num_batches * num_epochs):
+    @nnx.scan
+    def _scan_fn(carry, t):
+        model, optimizer, rng = carry
         rng, loss = _train_step(model, optimizer, rng)
+        return (model, optimizer, rng), loss
 
-    return loss
+    _, losses = _scan_fn(
+        (model, optimizer, rng), jnp.arange(num_batches * num_epochs)
+    )
+
+    return losses[-1]
+
+    # for _ in range(num_batches * num_epochs):
+    #     rng, loss = _train_step(model, optimizer, rng)
+    # return loss
 
 
 def train(  # noqa: PLR0915 this is a long function, don't limit to 50 lines
@@ -271,7 +282,7 @@ def train(  # noqa: PLR0915 this is a long function, don't limit to 50 lines
         frac = jnp.mean(J_policy < J_spc)
         return y, U, jnp.mean(J_spc), jnp.mean(J_policy), frac
 
-    # @nnx.jit
+    @nnx.jit
     def jit_fit(
         policy: Policy,
         optimizer: nnx.Optimizer,
@@ -333,7 +344,9 @@ def train(  # noqa: PLR0915 this is a long function, don't limit to 50 lines
             f" spc cost {J_spc:.4f} |"
             f" {100 * frac:.2f}% policy is best |"
             f" loss {loss:.4f} |"
-            f" {time_elapsed} elapsed"
+            f" {time_elapsed} elapsed |"
+            f" {sim_time:.2f} sim |"
+            f" {fit_time:.2f} fit"
         )
 
         # Tensorboard logging
