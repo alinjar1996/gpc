@@ -110,7 +110,13 @@ def test_train() -> None:
 
     env = ParticleEnv()
     ctrl = PredictiveSampling(env.task, num_samples=8, noise_level=0.1)
-    net = DenoisingMLP([32, 32])
+    net = DenoisingMLP(
+        action_size=env.task.model.nu,
+        observation_size=env.observation_size,
+        horizon=env.task.planning_horizon,
+        hidden_layers=[32, 32],
+        rngs=nnx.Rngs(0),
+    )
     policy = train(
         env,
         ctrl,
@@ -189,7 +195,7 @@ def test_policy() -> None:
 
 
 if __name__ == "__main__":
-    test_simulate()
-    test_fit()
-    # test_train()
-    test_policy()
+    # test_simulate()
+    # test_fit()
+    test_train()
+    # test_policy()
