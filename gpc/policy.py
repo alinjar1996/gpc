@@ -1,6 +1,6 @@
 import pickle
 from pathlib import Path
-from typing import Union
+from typing import Tuple, Union
 
 import jax
 import jax.numpy as jnp
@@ -98,14 +98,22 @@ class Policy:
         Returns:
             The updated action sequence
         """
+        # Set the initial sample
         warm_start_level = jnp.clip(warm_start_level, 0.0, 1.0)
         noise = jax.random.normal(rng, prev.shape)
         U = warm_start_level * prev + (1 - warm_start_level) * noise
-        # TODO: scan
-        # for t in jnp.arange(0.0, 1.0, self.dt):
-        for t in jnp.arange(0.0, 1.0, 0.1):
-            v = self.model(U, y, jnp.array([t]))
-            U += self.dt * v
-            U = jax.numpy.clip(U, self.u_min, self.u_max)
 
+        def _step(args: Tuple[jax.Array, float]) -> Tuple[jax.Array, float]:
+            """Flow the sample U along the learned vector field."""
+            U, t = args
+            U += self.dt * self.model(U, y, t)
+            U = jax.numpy.clip(U, self.u_min, self.u_max)
+            return U, t + self.dt
+
+        # While t < 1, U += dt * model(U, y, t)
+        U, t = jax.lax.while_loop(
+            lambda args: jnp.all(args[1] < 1.0),
+            _step,
+            (U, jnp.zeros(1)),
+        )
         return U
