@@ -240,9 +240,6 @@ def train(  # noqa: PLR0915 this is a long function, don't limit to 50 lines
     # Set up the policy
     policy = Policy(net, env.task.u_min, env.task.u_max)
 
-    # Split the policy network into architecture and parameters
-    graphdef, params = nnx.split(net)
-
     # Set up the optimizer
     optimizer = nnx.Optimizer(net, optax.adam(learning_rate))
 
@@ -329,7 +326,7 @@ def train(  # noqa: PLR0915 this is a long function, don't limit to 50 lines
         # Save a policy checkpoint
         if i % checkpoint_every == 0 and i > 0:
             ckpt_path = log_dir / f"policy_ckpt_{i}.pkl"
-            policy.replace(params=params).save(ckpt_path)
+            policy.save(ckpt_path)
             print(f"Saved policy checkpoint to {ckpt_path}")
 
         # Print a performance summary

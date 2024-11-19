@@ -125,6 +125,7 @@ def test_train() -> None:
         log_dir=log_dir,
         num_iters=3,
         num_envs=128,
+        checkpoint_every=1,
     )
 
     assert isinstance(policy, Policy)
