@@ -278,7 +278,7 @@ def train(  # noqa: PLR0915 this is a long function, don't limit to 50 lines
         observations: jax.Array,
         actions: jax.Array,
         rng: jax.Array,
-    ) -> Tuple[DenoisingMLP, nnx.Optimizer, jax.Array]:
+    ) -> jax.Array:
         """Fit the policy network to the data.
 
         Args:
