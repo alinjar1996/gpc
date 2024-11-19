@@ -6,6 +6,7 @@ import jax
 import jax.numpy as jnp
 import matplotlib.pyplot as plt
 import optax
+from flax import nnx
 from hydrax.algs import PredictiveSampling
 
 from gpc.architectures import DenoisingMLP
@@ -23,16 +24,15 @@ def test_simulate() -> None:
         PredictiveSampling(env.task, num_samples=8, noise_level=0.1),
         num_policy_samples=8,
     )
-    net = DenoisingMLP([32, 32])
-    rng, init_rng = jax.random.split(rng)
-    params = net.init(
-        init_rng,
-        jnp.zeros((env.task.planning_horizon, env.task.model.nu)),
-        jnp.zeros(env.observation_size),
-        jnp.zeros(1),
+    net = DenoisingMLP(
+        action_size=env.task.model.nu,
+        observation_size=env.observation_size,
+        horizon=env.task.planning_horizon,
+        hidden_layers=[32, 32],
+        rngs=nnx.Rngs(0),
     )
 
-    policy = Policy(net, params, env.task.u_min, env.task.u_max)
+    policy = Policy(net, env.task.u_min, env.task.u_max)
 
     rng, episode_rng = jax.random.split(rng)
     y, U, J_spc, J_policy = simulate_episode(
@@ -66,22 +66,23 @@ def test_fit() -> None:
         plt.show(block=False)
 
     # Set up the policy network
-    net = DenoisingMLP([32, 32])
-    rng, init_rng = jax.random.split(rng)
-    params = net.init(init_rng, jnp.zeros((1, 1)), jnp.zeros(1), jnp.zeros(1))
+    net = DenoisingMLP(
+        action_size=1,
+        observation_size=1,
+        horizon=1,
+        hidden_layers=[32, 32],
+        rngs=nnx.Rngs(0),
+    )
 
-    # Initialize the optimizer
-    optimizer = optax.adam(1e-2)
-    opt_state = optimizer.init(params)
+    # Set up the optimizer
+    optimizer = nnx.Optimizer(net, optax.adam(1e-2))
     batch_size = 512  # can be larger than the dataset b/c added noise
     num_epochs = 1000
 
     # Fit the policy network
     st = time.time()
     rng, fit_rng = jax.random.split(rng)
-    params, opt_state, loss = fit_policy(
-        y, U, net, params, optimizer, opt_state, fit_rng, batch_size, num_epochs
-    )
+    loss = fit_policy(y, U, net, optimizer, batch_size, num_epochs, fit_rng)
     print("Final loss:", loss)
     assert loss < 1.0
     print("Fit time:", time.time() - st)
@@ -92,7 +93,7 @@ def test_fit() -> None:
     U_test = jax.random.normal(test_rng, (100, 1, 1))
     dt = 0.1
     for t in jnp.arange(0.0, 1.0, dt):
-        v = net.apply(params, U_test, y_test, jnp.tile(t, (100, 1)))
+        v = net(U_test, y_test, jnp.tile(t, (100, 1)))
         U_test += v * dt
 
     if __name__ == "__main__":
@@ -109,7 +110,13 @@ def test_train() -> None:
 
     env = ParticleEnv()
     ctrl = PredictiveSampling(env.task, num_samples=8, noise_level=0.1)
-    net = DenoisingMLP([32, 32])
+    net = DenoisingMLP(
+        action_size=env.task.model.nu,
+        observation_size=env.observation_size,
+        horizon=env.task.planning_horizon,
+        hidden_layers=[32, 32],
+        rngs=nnx.Rngs(0),
+    )
     policy = train(
         env,
         ctrl,
@@ -118,6 +125,7 @@ def test_train() -> None:
         log_dir=log_dir,
         num_iters=3,
         num_envs=128,
+        checkpoint_every=1,
     )
 
     assert isinstance(policy, Policy)
@@ -144,20 +152,19 @@ def test_policy() -> None:
     num_actions = 2
     num_obs = 3
 
-    # Create a toy network and parameters
-    rng, init_rng = jax.random.split(rng)
-    mlp = DenoisingMLP([64, 64])
-    params = mlp.init(
-        init_rng,
-        jnp.zeros((num_steps, num_actions)),
-        jnp.zeros(num_obs),
-        jnp.zeros(1),
+    # Create a toy network
+    mlp = DenoisingMLP(
+        action_size=num_actions,
+        observation_size=num_obs,
+        horizon=num_steps,
+        hidden_layers=[32, 32],
+        rngs=nnx.Rngs(0),
     )
 
     # Create the policy
     u_min = -2 * jnp.ones(num_actions)
-    u_max = 0.1 * jnp.ones(num_actions)
-    policy = Policy(mlp, params, u_min, u_max)
+    u_max = jnp.ones(num_actions)
+    policy = Policy(mlp, u_min, u_max)
 
     # Test running the policy
     rng, apply_rng = jax.random.split(rng)
@@ -166,6 +173,7 @@ def test_policy() -> None:
     U1 = policy.apply(U, y, apply_rng)
     assert U1.shape == (num_steps, num_actions)
 
+    assert jnp.all(U1 != 0.0)
     assert jnp.all(U1 >= u_min)
     assert jnp.all(U1 <= u_max)
 
@@ -176,9 +184,9 @@ def test_policy() -> None:
     policy.save(local_dir / "policy.pkl")
     del policy
 
-    policy = Policy.load(local_dir / "policy.pkl")
+    policy2 = Policy.load(local_dir / "policy.pkl")
 
-    U2 = jax.jit(policy.apply)(U, y, apply_rng)
+    U2 = jax.jit(policy2.apply)(U, y, apply_rng)
     assert jnp.allclose(U2, U1)
 
     # Cleanup
@@ -188,7 +196,7 @@ def test_policy() -> None:
 
 
 if __name__ == "__main__":
-    # test_simulate()
-    # test_fit()
+    test_simulate()
+    test_fit()
     test_train()
-    # test_policy()
+    test_policy()
