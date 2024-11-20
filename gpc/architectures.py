@@ -68,11 +68,21 @@ class DenoisingMLP(nnx.Module):
         self.mlp = MLP(
             [input_size] + list(hidden_layers) + [output_size], rngs=rngs
         )
+        self.batch_norm = nnx.BatchNorm(
+            num_features=input_size,
+            momentum=0.9,
+            epsilon=1e-5,
+            axis=-1,
+            use_scale=True,
+            use_bias=True,
+            rngs=rngs,
+        )
 
     def __call__(self, u: jax.Array, y: jax.Array, t: jax.Array) -> jax.Array:
         """Forward pass through the network."""
         batches = u.shape[:-2]
         u_flat = u.reshape(batches + (self.horizon * self.action_size,))
         x = jnp.concatenate([u_flat, y, t], axis=-1)
+        x = self.batch_norm(x)
         x = self.mlp(x)
         return x.reshape(batches + (self.horizon, self.action_size))
