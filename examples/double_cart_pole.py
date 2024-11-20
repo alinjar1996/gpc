@@ -35,7 +35,7 @@ if __name__ == "__main__":
             net,
             num_policy_samples=32,
             log_dir="/tmp/gpc_double_cart_pole",
-            num_iters=10,
+            num_iters=100,
             num_envs=128,
             num_epochs=10,
         )
@@ -47,7 +47,7 @@ if __name__ == "__main__":
         print(f"Loading policy from {save_file}")
         policy = Policy.load(save_file)
         test_interactive(
-            env, policy, inference_timestep=0.01, warm_start_level=0.5
+            env, policy, inference_timestep=0.01, warm_start_level=1.0
         )
 
     else:
