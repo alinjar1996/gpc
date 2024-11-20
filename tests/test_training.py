@@ -31,8 +31,16 @@ def test_simulate() -> None:
         hidden_layers=[32, 32],
         rngs=nnx.Rngs(0),
     )
+    normalizer = nnx.BatchNorm(
+        env.observation_size,
+        momentum=0.1,
+        epsilon=1e-5,
+        use_bias=False,
+        use_scale=False,
+        rngs=nnx.Rngs(0),
+    )
 
-    policy = Policy(net, env.task.u_min, env.task.u_max)
+    policy = Policy(net, normalizer, env.task.u_min, env.task.u_max)
 
     rng, episode_rng = jax.random.split(rng)
     y, U, J_spc, J_policy = simulate_episode(
@@ -206,7 +214,7 @@ def test_policy() -> None:
 
 
 if __name__ == "__main__":
-    # test_simulate()
-    # test_fit()
-    # test_train()
+    test_simulate()
+    test_fit()
+    test_train()
     test_policy()
