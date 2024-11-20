@@ -161,10 +161,20 @@ def test_policy() -> None:
         rngs=nnx.Rngs(0),
     )
 
+    # Create an observation normalizer
+    normalizer = nnx.BatchNorm(
+        num_obs,
+        momentum=0.1,
+        epsilon=1e-5,
+        use_bias=False,
+        use_scale=False,
+        rngs=nnx.Rngs(0),
+    )
+
     # Create the policy
     u_min = -2 * jnp.ones(num_actions)
     u_max = jnp.ones(num_actions)
-    policy = Policy(mlp, u_min, u_max)
+    policy = Policy(mlp, normalizer, u_min, u_max)
 
     # Test running the policy
     rng, apply_rng = jax.random.split(rng)
@@ -196,7 +206,7 @@ def test_policy() -> None:
 
 
 if __name__ == "__main__":
-    test_simulate()
-    test_fit()
-    test_train()
+    # test_simulate()
+    # test_fit()
+    # test_train()
     test_policy()

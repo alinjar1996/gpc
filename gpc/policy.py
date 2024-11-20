@@ -19,12 +19,14 @@ class Policy:
 
     Attributes:
         model: The flow matching network that generates the action sequence.
+        normalizer: Observation normalization module.
         u_min: The minimum action values.
         u_max: The maximum action values.
         dt: The integration step size for flow matching.
     """
 
     model: DenoisingMLP
+    normalizer: nnx.BatchNorm
     u_min: jax.Array
     u_max: jax.Array
     dt: float = 0.1
@@ -51,6 +53,7 @@ class Policy:
             "model_args": model_args,
             "policy_args": policy_args,
             "state": state,
+            "normalizer": self.normalizer,
         }
         with open(path, "wb") as f:
             pickle.dump(data, f)
@@ -68,11 +71,12 @@ class Policy:
         with open(path, "rb") as f:
             data = pickle.load(f)
 
+        normalizer = data["normalizer"]
         empty_model = DenoisingMLP(**data["model_args"], rngs=nnx.Rngs(0))
         graphdef, _ = nnx.split(empty_model)
         model = nnx.merge(graphdef, data["state"])
 
-        return Policy(model, **data["policy_args"])
+        return Policy(model, normalizer, **data["policy_args"])
 
     def apply(
         self,
@@ -98,6 +102,9 @@ class Policy:
         Returns:
             The updated action sequence
         """
+        # Normalize the observation, but don't update the stored statistics
+        y = self.normalizer(y, use_running_average=True)
+
         # Set the initial sample
         warm_start_level = jnp.clip(warm_start_level, 0.0, 1.0)
         noise = jax.random.normal(rng, prev.shape)

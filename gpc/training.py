@@ -22,7 +22,6 @@ def simulate_episode(
     env: TrainingEnv,
     ctrl: PolicyAugmentedController,
     policy: Policy,
-    normalizer: nnx.BatchNorm,
     exploration_noise_level: float,
     rng: jax.Array,
 ) -> Tuple[jax.Array, jax.Array, jax.Array, jax.Array]:
@@ -58,11 +57,10 @@ def simulate_episode(
         # Sample action sequences from the learned policy
         # TODO: consider warm-starting the policy
         y = env._get_observation(x)
-        y_norm = normalizer(y, use_running_average=True)
         rng, policy_rng, explore_rng = jax.random.split(psi.base_params.rng, 3)
         policy_rngs = jax.random.split(policy_rng, ctrl.num_policy_samples)
         U = jnp.zeros((env.task.planning_horizon, env.task.model.nu))
-        Us = jax.vmap(policy.apply, in_axes=(None, None, 0))(U, y_norm, policy_rngs)
+        Us = jax.vmap(policy.apply, in_axes=(None, None, 0))(U, y, policy_rngs)
 
         # Place the samples into the predictive control parameters so they
         # can be used in the predictive control update
@@ -107,7 +105,7 @@ def fit_policy(
     """Fit a flow matching model to the data.
 
     Args:
-        observations: The observations y.
+        observations: The (normalized) observations y.
         action_sequences: The corresponding target action sequences U.
         model: The policy network, outputs the flow matching vector field.
         optimizer: The optimizer (e.g. Adam).
@@ -192,6 +190,7 @@ def train(  # noqa: PLR0915 this is a long function, don't limit to 50 lines
     num_epochs: int = 10,
     checkpoint_every: int = 10,
     exploration_noise_level: float = 0.0,
+    normalize_observations: bool = True,
 ) -> None:
     """Train a generative predictive controller.
 
@@ -209,6 +208,7 @@ def train(  # noqa: PLR0915 this is a long function, don't limit to 50 lines
         checkpoint_every: Number of iterations between policy checkpoint saves.
         exploration_noise_level: Standard deviation of the gaussian noise added
                                  to each action during episode simulation.
+        normalize_observations: Flag for observation normalization.
 
     """
     rng = jax.random.key(0)
@@ -240,7 +240,7 @@ def train(  # noqa: PLR0915 this is a long function, don't limit to 50 lines
     assert env.task == ctrl.task
 
     # Set up the policy
-    normalizer = nnx.BatchNorm(  # TODO: include in policy
+    normalizer = nnx.BatchNorm(
         num_features=env.observation_size,
         momentum=0.1,
         use_bias=False,
@@ -248,7 +248,7 @@ def train(  # noqa: PLR0915 this is a long function, don't limit to 50 lines
         use_fast_variance=False,
         rngs=nnx.Rngs(0),
     )
-    policy = Policy(net, env.task.u_min, env.task.u_max)
+    policy = Policy(net, normalizer, env.task.u_min, env.task.u_max)
 
     # Set up the optimizer
     optimizer = nnx.Optimizer(net, optax.adam(learning_rate))
@@ -261,7 +261,7 @@ def train(  # noqa: PLR0915 this is a long function, don't limit to 50 lines
     # Set up some helper functions
     @nnx.jit
     def jit_simulate(
-        policy: Policy, normalizer: nnx.BatchNorm, rng: jax.Array
+        policy: Policy, rng: jax.Array
     ) -> Tuple[jax.Array, jax.Array, jax.Array, jax.Array, jax.Array]:
         """Simulate episodes in parallel.
 
@@ -279,8 +279,8 @@ def train(  # noqa: PLR0915 this is a long function, don't limit to 50 lines
         rngs = jax.random.split(rng, num_envs)
 
         y, U, J_spc, J_policy = jax.vmap(
-            simulate_episode, in_axes=(None, None, None, None, None, 0)
-        )(env, ctrl, policy, normalizer, exploration_noise_level, rngs)
+            simulate_episode, in_axes=(None, None, None, None, 0)
+        )(env, ctrl, policy, exploration_noise_level, rngs)
 
         frac = jnp.mean(J_policy < J_spc)
         return y, U, jnp.mean(J_spc), jnp.mean(J_policy), frac
@@ -288,7 +288,6 @@ def train(  # noqa: PLR0915 this is a long function, don't limit to 50 lines
     @nnx.jit
     def jit_fit(
         policy: Policy,
-        normalizer: nnx.BatchNorm,
         optimizer: nnx.Optimizer,
         observations: jax.Array,
         actions: jax.Array,
@@ -310,8 +309,9 @@ def train(  # noqa: PLR0915 this is a long function, don't limit to 50 lines
         y = observations.reshape(-1, observations.shape[-1])
         U = actions.reshape(-1, env.task.planning_horizon, env.task.model.nu)
 
-        # DEBUG
-        # y_norm = normalizer(y)
+        # Normalize the observations, updating the running statistics stored
+        # in the policy
+        y = policy.normalizer(y, use_running_average=not normalize_observations)
 
         # Do the regression
         return fit_policy(
@@ -325,21 +325,15 @@ def train(  # noqa: PLR0915 this is a long function, don't limit to 50 lines
         policy.model.eval()
         sim_start = time.time()
         rng, episode_rng = jax.random.split(rng)
-        y, U, J_spc, J_policy, frac = jit_simulate(policy, normalizer, episode_rng)
+        y, U, J_spc, J_policy, frac = jit_simulate(policy, episode_rng)
         y.block_until_ready()
         sim_time = time.time() - sim_start
-
-
-        # DEBUG
-        print(jnp.var(y, axis=(0, 1)))
-        y = normalizer(y, use_running_average=False)
-        print(jnp.var(y, axis=(0, 1)))
 
         # Fit the policy network U = NNet(y) to the data
         policy.model.train()
         fit_start = time.time()
         rng, fit_rng = jax.random.split(rng)
-        loss = jit_fit(policy, normalizer, optimizer, y, U, fit_rng)
+        loss = jit_fit(policy, optimizer, y, U, fit_rng)
         loss.block_until_ready()
         fit_time = time.time() - fit_start
 
