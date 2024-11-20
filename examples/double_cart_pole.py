@@ -38,6 +38,7 @@ if __name__ == "__main__":
             num_iters=10,
             num_envs=128,
             num_epochs=10,
+            exploration_noise_level=0.1,
         )
         policy.save(save_file)
         print(f"Saved policy to {save_file}")
@@ -47,7 +48,7 @@ if __name__ == "__main__":
         print(f"Loading policy from {save_file}")
         policy = Policy.load(save_file)
         test_interactive(
-            env, policy, inference_timestep=0.01, warm_start_level=0.5
+            env, policy, inference_timestep=0.01, warm_start_level=1.0
         )
 
     else:

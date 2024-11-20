@@ -30,6 +30,7 @@ def test_interactive(
 
     # Set up the policy
     policy = policy.replace(dt=inference_timestep)
+    policy.model.eval()
     jit_policy = jax.jit(
         partial(policy.apply, warm_start_level=warm_start_level)
     )
