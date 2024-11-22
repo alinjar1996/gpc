@@ -93,7 +93,7 @@ def test_denoising_cnn() -> None:
     obs_dim = 4
 
     # Define the network architecture
-    net = DenoisingCNN(action_dim, obs_dim, num_steps, nnx.Rngs(0))
+    net = DenoisingCNN(action_dim, obs_dim, num_steps, [32, 32], nnx.Rngs(0))
 
     # Test on some data
     U = jnp.ones((num_steps, action_dim))
@@ -111,7 +111,7 @@ def test_denoising_cnn() -> None:
 
 
 if __name__ == "__main__":
-    # test_mlp_construction()
-    # test_mlp_save_load()
-    # test_denoising_mlp()
+    test_mlp_construction()
+    test_mlp_save_load()
+    test_denoising_mlp()
     test_denoising_cnn()

@@ -90,6 +90,7 @@ class DenoisingCNN(nnx.Module):
         action_size: int,
         observation_size: int,
         horizon: int,
+        hidden_layers: Sequence[int],
         rngs: nnx.Rngs,
     ):
         """Initialize the network.
@@ -98,11 +99,14 @@ class DenoisingCNN(nnx.Module):
             action_size: Dimension of the actions (u).
             observation_size: Dimension of the observations (y).
             horizon: Number of steps in the action sequence (U = [u0, u1, ...]).
+            hidden_layers: List of hidden layer feature sizes.
             rngs: Random number generators for initialization.
         """
         self.action_size = action_size
         self.observation_size = observation_size
         self.horizon = horizon
+        self.hidden_layers = hidden_layers
+        self.num_hidden = len(hidden_layers)
 
         # Linear layers project y and t along the whole horizon
         self.l1 = nnx.LinearGeneral(
@@ -111,36 +115,34 @@ class DenoisingCNN(nnx.Module):
         self.l2 = nnx.LinearGeneral(1, (horizon, 1), rngs=rngs)
 
         # Convolutional layers process the concatenated input
-        self.c1 = nnx.Conv(
-            in_features=action_size + observation_size + 1,
-            out_features=32,
-            kernel_size=3,
-            padding="SAME",
-            rngs=rngs,
+        feature_sizes = (
+            [action_size + observation_size + 1] + hidden_layers + [action_size]
         )
-        self.c2 = nnx.Conv(
-            in_features=32,
-            out_features=32,
-            kernel_size=3,
-            padding="SAME",
-            rngs=rngs,
-        )
-        self.c3 = nnx.Conv(
-            in_features=32,
-            out_features=action_size,
-            kernel_size=3,
-            padding="SAME",
-            rngs=rngs,
-        )
+        for i, (input_size, output_size) in enumerate(
+            zip(feature_sizes[:-1], feature_sizes[1:], strict=False)
+        ):
+            # TODO: use nnx.scan to scan over layers, reducing compile times
+            setattr(
+                self,
+                f"c{i}",
+                nnx.Conv(
+                    in_features=input_size,
+                    out_features=output_size,
+                    kernel_size=3,
+                    padding="SAME",
+                    rngs=rngs,
+                ),
+            )
 
     def __call__(self, u: jax.Array, y: jax.Array, t: jax.Array) -> jax.Array:
         """Forward pass through the network."""
         y = self.l1(y)
         t = self.l2(t)
         x = jnp.concatenate([u, y, t], axis=-1)
-        x = self.c1(x)
-        x = nnx.swish(x)
-        x = self.c2(x)
-        x = nnx.swish(x)
-        x = self.c3(x)
+
+        for i in range(self.num_hidden):
+            x = getattr(self, f"c{i}")(x)
+            x = nnx.swish(x)
+        x = getattr(self, f"c{self.num_hidden}")(x)
+
         return x
