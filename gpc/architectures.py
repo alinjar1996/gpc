@@ -76,3 +76,71 @@ class DenoisingMLP(nnx.Module):
         x = jnp.concatenate([u_flat, y, t], axis=-1)
         x = self.mlp(x)
         return x.reshape(batches + (self.horizon, self.action_size))
+
+
+class DenoisingCNN(nnx.Module):
+    """A convolutional neural network for action sequence denoising.
+
+    Computes U* = NNet(U, y, t), where U is the noisy action sequence, y is the
+    initial observation, and t is the time step in the denoising process.
+    """
+
+    def __init__(
+        self,
+        action_size: int,
+        observation_size: int,
+        horizon: int,
+        rngs: nnx.Rngs,
+    ):
+        """Initialize the network.
+
+        Args:
+            action_size: Dimension of the actions (u).
+            observation_size: Dimension of the observations (y).
+            horizon: Number of steps in the action sequence (U = [u0, u1, ...]).
+            rngs: Random number generators for initialization.
+        """
+        self.action_size = action_size
+        self.observation_size = observation_size
+        self.horizon = horizon
+
+        # Linear layers project y and t along the whole horizon
+        self.l1 = nnx.LinearGeneral(
+            observation_size, (horizon, observation_size), rngs=rngs
+        )
+        self.l2 = nnx.LinearGeneral(1, (horizon, 1), rngs=rngs)
+
+        # Convolutional layers process the concatenated input
+        self.c1 = nnx.Conv(
+            in_features=action_size + observation_size + 1,
+            out_features=32,
+            kernel_size=3,
+            padding="SAME",
+            rngs=rngs,
+        )
+        self.c2 = nnx.Conv(
+            in_features=32,
+            out_features=32,
+            kernel_size=3,
+            padding="SAME",
+            rngs=rngs,
+        )
+        self.c3 = nnx.Conv(
+            in_features=32,
+            out_features=action_size,
+            kernel_size=3,
+            padding="SAME",
+            rngs=rngs,
+        )
+
+    def __call__(self, u: jax.Array, y: jax.Array, t: jax.Array) -> jax.Array:
+        """Forward pass through the network."""
+        y = self.l1(y)
+        t = self.l2(t)
+        x = jnp.concatenate([u, y, t], axis=-1)
+        x = self.c1(x)
+        x = nnx.swish(x)
+        x = self.c2(x)
+        x = nnx.swish(x)
+        x = self.c3(x)
+        return x
