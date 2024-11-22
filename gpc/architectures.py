@@ -108,20 +108,12 @@ class DenoisingCNN(nnx.Module):
         self.hidden_layers = hidden_layers
         self.num_hidden = len(hidden_layers)
 
-        # Linear layers project y and t along the whole horizon
-        self.l1 = nnx.LinearGeneral(
-            observation_size, (horizon, observation_size), rngs=rngs
-        )
-        self.l2 = nnx.LinearGeneral(1, (horizon, 1), rngs=rngs)
-
-        # Convolutional layers process the concatenated input
-        feature_sizes = (
-            [action_size + observation_size + 1] + hidden_layers + [action_size]
-        )
+        # TODO: use nnx.scan to scan over layers, reducing compile times
+        feature_sizes = [action_size] + list(hidden_layers) + [action_size]
         for i, (input_size, output_size) in enumerate(
             zip(feature_sizes[:-1], feature_sizes[1:], strict=False)
         ):
-            # TODO: use nnx.scan to scan over layers, reducing compile times
+            # Convolutional layer
             setattr(
                 self,
                 f"c{i}",
@@ -134,15 +126,43 @@ class DenoisingCNN(nnx.Module):
                 ),
             )
 
+            # Observation conditioning layer
+            setattr(
+                self,
+                f"l{i}",
+                nnx.LinearGeneral(
+                    observation_size + 1, (horizon, output_size), rngs=rngs
+                ),
+            )
+
+            # Batch normalization
+            setattr(
+                self,
+                f"bn{i}",
+                nnx.BatchNorm(num_features=input_size, rngs=rngs),
+            )
+
     def __call__(self, u: jax.Array, y: jax.Array, t: jax.Array) -> jax.Array:
         """Forward pass through the network."""
-        y = self.l1(y)
-        t = self.l2(t)
-        x = jnp.concatenate([u, y, t], axis=-1)
+        y = jnp.concatenate([y, t], axis=-1)
 
+        x = u
         for i in range(self.num_hidden):
+            # Batch normalization
+            x = getattr(self, f"bn{i}")(x)
+
+            # Convolutional layer
             x = getattr(self, f"c{i}")(x)
+
+            # Observation conditioning
+            x += getattr(self, f"l{i}")(y)
+
+            # Activation
             x = nnx.swish(x)
+
+        # Final convolutional layer
+        x = getattr(self, f"bn{self.num_hidden}")(x)
         x = getattr(self, f"c{self.num_hidden}")(x)
+        x += getattr(self, f"l{self.num_hidden}")(y)
 
         return x
