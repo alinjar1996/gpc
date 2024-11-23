@@ -1,6 +1,6 @@
-import pickle
 from pathlib import Path
 
+import cloudpickle
 import jax.numpy as jnp
 from flax import nnx
 
@@ -36,21 +36,12 @@ def test_mlp_save_load() -> None:
     local_dir = Path("_test_mlp")
     local_dir.mkdir(parents=True, exist_ok=True)
 
-    _, state = nnx.split(mlp)
-
-    # Save the model parameters
     model_path = local_dir / "mlp.pkl"
     with Path(model_path).open("wb") as f:
-        pickle.dump(state, f)
-
-    # Load the model from a file
-    abstract_model = nnx.eval_shape(lambda: MLP(layer_sizes, rngs=nnx.Rngs(0)))
-    graphdef, _ = nnx.split(abstract_model)
+        cloudpickle.dump(mlp, f)
 
     with Path(model_path).open("rb") as f:
-        state_restored = pickle.load(f)
-
-    model_restored = nnx.merge(graphdef, state_restored)
+        model_restored = cloudpickle.load(f)
 
     # Check that the model is still functional
     restored_output = model_restored(dummy_input)
@@ -111,7 +102,7 @@ def test_denoising_cnn() -> None:
 
 
 if __name__ == "__main__":
-    # test_mlp_construction()
-    # test_mlp_save_load()
-    # test_denoising_mlp()
+    test_mlp_construction()
+    test_mlp_save_load()
+    test_denoising_mlp()
     test_denoising_cnn()
