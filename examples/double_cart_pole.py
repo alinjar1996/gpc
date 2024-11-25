@@ -1,10 +1,9 @@
 import sys
 
-from flax import nnx
-from hydrax.algs import PredictiveSampling
-
 import jax
 import jax.numpy as jnp
+from flax import nnx
+from hydrax.algs import PredictiveSampling
 
 from gpc.architectures import DenoisingCNN
 from gpc.envs import DoubleCartPoleEnv
@@ -12,37 +11,37 @@ from gpc.policy import Policy
 from gpc.testing import test_interactive
 from gpc.training import train
 
-from mujoco import mjx
-
 
 class GPCSamplingPolicy(PredictiveSampling):
     """Sampling-based controller that takes the best generated control tape."""
+
     def __init__(self, env, policy, num_samples):
         super().__init__(env.task, num_samples=num_samples, noise_level=0.0)
         self.env = env
         self.policy = policy
         self.policy.model.eval()
 
-    def optimize(self, state, rng):
+    def optimize(self, prev, state, rng):
         # Get random seeds
         rng, sample_rng = jax.random.split(rng)
         sample_rngs = jax.random.split(sample_rng, self.num_samples)
 
         # Set the initial guess of the action sequence and the observation
-        U0 = jnp.zeros((self.task.planning_horizon, self.task.model.nu))
         y = self.env.get_obs(state)
 
         # Generate num_samples action sequences
-        Us = jax.vmap(self.policy.apply, in_axes=(None, None, 0))(
-            U0, y, sample_rngs)
-        
+        warm_start_level = 0.5
+        Us = jax.vmap(self.policy.apply, in_axes=(None, None, 0, None))(
+            prev, y, sample_rngs, warm_start_level
+        )
+
         # Pick the best action sequence based on rollouts
         rng, rollout_rng = jax.random.split(rng)
         rollouts = self.rollout_with_randomizations(state, Us, rollout_rng)
         costs = jnp.sum(rollouts.costs, axis=1)
         best_idx = jnp.argmin(costs)
         U_best = Us[best_idx]
-        
+
         return U_best
 
 
@@ -85,18 +84,9 @@ if __name__ == "__main__":
         print(f"Loading policy from {save_file}")
         policy = Policy.load(save_file)
 
-        ctrl = GPCSamplingPolicy(env, policy, num_samples=128)
+        ctrl = GPCSamplingPolicy(env, policy, num_samples=512)
 
-        rng = jax.random.key(0)
-        state = mjx.make_data(env.task.model)
-        rng, opt_rng = jax.random.split(rng)
-        U = ctrl.optimize(state, opt_rng)
-
-
-
-        test_interactive(
-          env, ctrl, inference_timestep=0.01, warm_start_level=1.0
-        )
+        test_interactive(env, ctrl)
 
     else:
         print(usage)
