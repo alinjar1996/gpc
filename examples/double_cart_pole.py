@@ -37,8 +37,11 @@ class GPCSamplingPolicy(PredictiveSampling):
             U0, y, sample_rngs)
         
         # Pick the best action sequence based on rollouts
-        # TODO
-        U_best = Us[0]
+        rng, rollout_rng = jax.random.split(rng)
+        rollouts = self.rollout_with_randomizations(state, Us, rollout_rng)
+        costs = jnp.sum(rollouts.costs, axis=1)
+        best_idx = jnp.argmin(costs)
+        U_best = Us[best_idx]
         
         return U_best
 
