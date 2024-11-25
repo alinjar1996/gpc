@@ -1,13 +1,11 @@
-import pickle
 from pathlib import Path
 from typing import Tuple, Union
 
+import cloudpickle
 import jax
 import jax.numpy as jnp
 from flax import nnx
 from flax.struct import dataclass
-
-from gpc.architectures import DenoisingMLP
 
 
 @dataclass
@@ -25,7 +23,7 @@ class Policy:
         dt: The integration step size for flow matching.
     """
 
-    model: DenoisingMLP
+    model: nnx.Module
     normalizer: nnx.BatchNorm
     u_min: jax.Array
     u_max: jax.Array
@@ -37,26 +35,8 @@ class Policy:
         Args:
             path: The path to save the policy to.
         """
-        model_args = {
-            "action_size": self.model.action_size,
-            "observation_size": self.model.observation_size,
-            "horizon": self.model.horizon,
-            "hidden_layers": self.model.hidden_layers,
-        }
-        policy_args = {
-            "u_min": self.u_min,
-            "u_max": self.u_max,
-            "dt": self.dt,
-        }
-        _, state = nnx.split(self.model)
-        data = {
-            "model_args": model_args,
-            "policy_args": policy_args,
-            "state": state,
-            "normalizer": self.normalizer,
-        }
         with open(path, "wb") as f:
-            pickle.dump(data, f)
+            cloudpickle.dump(self, f)
 
     @staticmethod
     def load(path: Union[Path, str]) -> "Policy":
@@ -69,14 +49,8 @@ class Policy:
             The loaded policy instance
         """
         with open(path, "rb") as f:
-            data = pickle.load(f)
-
-        normalizer = data["normalizer"]
-        empty_model = DenoisingMLP(**data["model_args"], rngs=nnx.Rngs(0))
-        graphdef, _ = nnx.split(empty_model)
-        model = nnx.merge(graphdef, data["state"])
-
-        return Policy(model, normalizer, **data["policy_args"])
+            policy = cloudpickle.load(f)
+        return policy
 
     def apply(
         self,

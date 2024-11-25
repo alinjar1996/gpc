@@ -1,10 +1,10 @@
-import pickle
 from pathlib import Path
 
+import cloudpickle
 import jax.numpy as jnp
 from flax import nnx
 
-from gpc.architectures import MLP, DenoisingMLP
+from gpc.architectures import MLP, DenoisingCNN, DenoisingMLP
 
 
 def test_mlp_construction() -> None:
@@ -36,21 +36,12 @@ def test_mlp_save_load() -> None:
     local_dir = Path("_test_mlp")
     local_dir.mkdir(parents=True, exist_ok=True)
 
-    _, state = nnx.split(mlp)
-
-    # Save the model parameters
     model_path = local_dir / "mlp.pkl"
     with Path(model_path).open("wb") as f:
-        pickle.dump(state, f)
-
-    # Load the model from a file
-    abstract_model = nnx.eval_shape(lambda: MLP(layer_sizes, rngs=nnx.Rngs(0)))
-    graphdef, _ = nnx.split(abstract_model)
+        cloudpickle.dump(mlp, f)
 
     with Path(model_path).open("rb") as f:
-        state_restored = pickle.load(f)
-
-    model_restored = nnx.merge(graphdef, state_restored)
+        model_restored = cloudpickle.load(f)
 
     # Check that the model is still functional
     restored_output = model_restored(dummy_input)
@@ -86,7 +77,32 @@ def test_denoising_mlp() -> None:
     assert U_out.shape == (14, 24, num_steps, action_dim)
 
 
+def test_denoising_cnn() -> None:
+    """Test the denoising CNN."""
+    num_steps = 5
+    action_dim = 3
+    obs_dim = 4
+
+    # Define the network architecture
+    net = DenoisingCNN(action_dim, obs_dim, num_steps, [32, 32], nnx.Rngs(0))
+
+    # Test on some data
+    U = jnp.ones((num_steps, action_dim))
+    y = jnp.ones(obs_dim)
+    t = jnp.ones(1)
+    U_out = net(U, y, t)
+    assert U_out.shape == (num_steps, action_dim)
+
+    # Test on some batched data
+    U = jnp.ones((14, 24, num_steps, action_dim))
+    y = jnp.ones((14, 24, obs_dim))
+    t = jnp.ones((14, 24, 1))
+    U_out = net(U, y, t)
+    assert U_out.shape == (14, 24, num_steps, action_dim)
+
+
 if __name__ == "__main__":
     test_mlp_construction()
     test_mlp_save_load()
     test_denoising_mlp()
+    test_denoising_cnn()

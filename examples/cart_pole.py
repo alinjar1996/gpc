@@ -3,7 +3,7 @@ import sys
 from flax import nnx
 from hydrax.algs import PredictiveSampling
 
-from gpc.architectures import DenoisingMLP
+from gpc.architectures import DenoisingCNN
 from gpc.envs import CartPoleEnv
 from gpc.policy import Policy
 from gpc.testing import test_interactive
@@ -22,11 +22,11 @@ if __name__ == "__main__":
     if sys.argv[1] == "train":
         # Train the policy and save it to a file
         ctrl = PredictiveSampling(env.task, num_samples=32, noise_level=0.1)
-        net = DenoisingMLP(
+        net = DenoisingCNN(
             action_size=env.task.model.nu,
             observation_size=env.observation_size,
             horizon=env.task.planning_horizon,
-            hidden_layers=[64, 64],
+            feature_dims=[32, 32],
             rngs=nnx.Rngs(0),
         )
         policy = train(

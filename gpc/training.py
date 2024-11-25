@@ -5,12 +5,12 @@ from typing import Any, Tuple, Union
 
 import jax
 import jax.numpy as jnp
+import numpy as np
 import optax
 from flax import nnx
 from hydrax.alg_base import SamplingBasedController
 from tensorboardX import SummaryWriter
 
-from gpc.architectures import DenoisingMLP
 from gpc.augmented import PACParams, PolicyAugmentedController
 from gpc.envs import SimulatorState, TrainingEnv
 from gpc.policy import Policy
@@ -96,7 +96,7 @@ def simulate_episode(
 def fit_policy(
     observations: jax.Array,
     action_sequences: jax.Array,
-    model: DenoisingMLP,
+    model: nnx.Module,
     optimizer: nnx.Optimizer,
     batch_size: int,
     num_epochs: int,
@@ -180,7 +180,7 @@ def fit_policy(
 def train(  # noqa: PLR0915 this is a long function, don't limit to 50 lines
     env: TrainingEnv,
     ctrl: SamplingBasedController,
-    net: DenoisingMLP,
+    net: nnx.Module,
     num_policy_samples: int,
     log_dir: Union[Path, str],
     num_iters: int,
@@ -233,6 +233,12 @@ def train(  # noqa: PLR0915 this is a long function, don't limit to 50 lines
         f" {num_samples * ctrl.num_randomizations * num_envs}"
         f" (= {num_samples} x {ctrl.num_randomizations} x {num_envs})"
     )
+    print("")
+
+    # Print some info about the policy architecture
+    params = nnx.state(net, nnx.Param)
+    total_params = sum([np.prod(x.shape) for x in jax.tree.leaves(params)], 0)
+    print(f"Policy: {type(net).__name__} with {total_params} parameters")
     print("")
 
     # Set up the sampling-based controller and policy network
