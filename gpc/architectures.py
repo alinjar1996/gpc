@@ -122,11 +122,11 @@ class Conv1DBlock(nnx.Module):
 class ConditionalResidualBlock(nnx.Module):
     """A temporal convolutional block with FiLM conditional information.
 
-        ----------------------------------------------
-        |                                            |
-        |  -----------             -----------       |
-    x ---> | Encoder | --> (+) --> | Decoder | ---> (+) --->
-           -----------      |      -----------
+        -------------------------------------------------------------
+        |                                                           |
+        |  -----------             -----------     -----------      |
+    x ---> | Encoder | --> (+) --> | Dropout | --> | Decoder | --> (+) -->
+           -----------      |      -----------     -----------
                             |
                        ----------
     y -----------------| Linear |
