@@ -11,7 +11,6 @@ from flax import nnx
 from hydrax.alg_base import SamplingBasedController
 from tensorboardX import SummaryWriter
 
-from gpc.architectures import DenoisingMLP
 from gpc.augmented import PACParams, PolicyAugmentedController
 from gpc.envs import SimulatorState, TrainingEnv
 from gpc.policy import Policy
@@ -97,7 +96,7 @@ def simulate_episode(
 def fit_policy(
     observations: jax.Array,
     action_sequences: jax.Array,
-    model: DenoisingMLP,
+    model: nnx.Module,
     optimizer: nnx.Optimizer,
     batch_size: int,
     num_epochs: int,
@@ -181,7 +180,7 @@ def fit_policy(
 def train(  # noqa: PLR0915 this is a long function, don't limit to 50 lines
     env: TrainingEnv,
     ctrl: SamplingBasedController,
-    net: DenoisingMLP,
+    net: nnx.Module,
     num_policy_samples: int,
     log_dir: Union[Path, str],
     num_iters: int,
