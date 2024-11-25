@@ -5,6 +5,7 @@ from typing import Any, Tuple, Union
 
 import jax
 import jax.numpy as jnp
+import numpy as np
 import optax
 from flax import nnx
 from hydrax.alg_base import SamplingBasedController
@@ -233,6 +234,12 @@ def train(  # noqa: PLR0915 this is a long function, don't limit to 50 lines
         f" {num_samples * ctrl.num_randomizations * num_envs}"
         f" (= {num_samples} x {ctrl.num_randomizations} x {num_envs})"
     )
+    print("")
+
+    # Print some info about the policy architecture
+    params = nnx.state(net, nnx.Param)
+    total_params = sum([np.prod(x.shape) for x in jax.tree.leaves(params)], 0)
+    print(f"Policy: {type(net).__name__} with {total_params} parameters")
     print("")
 
     # Set up the sampling-based controller and policy network

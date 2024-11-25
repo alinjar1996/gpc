@@ -126,6 +126,13 @@ class DenoisingCNN(nnx.Module):
                 ),
             )
 
+            # Batch normalization
+            setattr(
+                self,
+                f"bn{i}",
+                nnx.BatchNorm(num_features=output_size, rngs=rngs),
+            )
+
             # Observation conditioning layer
             setattr(
                 self,
@@ -135,24 +142,17 @@ class DenoisingCNN(nnx.Module):
                 ),
             )
 
-            # Batch normalization
-            setattr(
-                self,
-                f"bn{i}",
-                nnx.BatchNorm(num_features=input_size, rngs=rngs),
-            )
-
     def __call__(self, u: jax.Array, y: jax.Array, t: jax.Array) -> jax.Array:
         """Forward pass through the network."""
         y = jnp.concatenate([y, t], axis=-1)
 
         x = u
         for i in range(self.num_hidden):
-            # Batch normalization
-            x = getattr(self, f"bn{i}")(x)
-
             # Convolutional layer
             x = getattr(self, f"c{i}")(x)
+
+            # Batch normalization
+            x = getattr(self, f"bn{i}")(x)
 
             # Observation conditioning
             x += getattr(self, f"l{i}")(y)
@@ -160,9 +160,12 @@ class DenoisingCNN(nnx.Module):
             # Activation
             x = nnx.swish(x)
 
-        # Final convolutional layer
-        x = getattr(self, f"bn{self.num_hidden}")(x)
+        # Final layer
         x = getattr(self, f"c{self.num_hidden}")(x)
+        x = getattr(self, f"bn{self.num_hidden}")(x)
         x += getattr(self, f"l{self.num_hidden}")(y)
+
+        # Residual connection
+        x += u
 
         return x

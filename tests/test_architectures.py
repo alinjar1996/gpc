@@ -102,7 +102,7 @@ def test_denoising_cnn() -> None:
 
 
 if __name__ == "__main__":
-    test_mlp_construction()
-    test_mlp_save_load()
-    test_denoising_mlp()
+    # test_mlp_construction()
+    # test_mlp_save_load()
+    # test_denoising_mlp()
     test_denoising_cnn()
