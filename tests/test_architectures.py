@@ -4,7 +4,7 @@ import cloudpickle
 import jax.numpy as jnp
 from flax import nnx
 
-from gpc.architectures import MLP, DenoisingCNN, DenoisingMLP
+from gpc.architectures import MLP, DenoisingCNN, DenoisingMLP, DenoisingUnet
 
 
 def test_mlp_construction() -> None:
@@ -101,8 +101,33 @@ def test_denoising_cnn() -> None:
     assert U_out.shape == (14, 24, num_steps, action_dim)
 
 
+def test_denoising_unet() -> None:
+    """Test the denoising Unet."""
+    num_steps = 5
+    action_dim = 3
+    obs_dim = 4
+
+    # Define the network architecture
+    net = DenoisingUnet(action_dim, obs_dim, num_steps, [32, 32], nnx.Rngs(0))
+
+    # Test on some data
+    U = jnp.ones((num_steps, action_dim))
+    y = jnp.ones(obs_dim)
+    t = jnp.ones(1)
+    U_out = net(U, y, t)
+    assert U_out.shape == (num_steps, action_dim)
+
+    # Test on some batched data
+    U = jnp.ones((14, 24, num_steps, action_dim))
+    y = jnp.ones((14, 24, obs_dim))
+    t = jnp.ones((14, 24, 1))
+    U_out = net(U, y, t)
+    assert U_out.shape == (14, 24, num_steps, action_dim)
+
+
 if __name__ == "__main__":
     # test_mlp_construction()
     # test_mlp_save_load()
     # test_denoising_mlp()
-    test_denoising_cnn()
+    # test_denoising_cnn()
+    test_denoising_unet()
