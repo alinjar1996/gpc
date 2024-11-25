@@ -3,7 +3,7 @@ import sys
 from flax import nnx
 from hydrax.algs import PredictiveSampling
 
-from gpc.architectures import DenoisingMLP
+from gpc.architectures import DenoisingCNN
 from gpc.envs import WalkerEnv
 from gpc.policy import Policy
 from gpc.testing import test_interactive
@@ -21,12 +21,12 @@ if __name__ == "__main__":
 
     if sys.argv[1] == "train":
         # Train the policy and save it to a file
-        ctrl = PredictiveSampling(env.task, num_samples=16, noise_level=0.3)
-        net = DenoisingMLP(
+        ctrl = PredictiveSampling(env.task, num_samples=64, noise_level=0.3)
+        net = DenoisingCNN(
             action_size=env.task.model.nu,
             observation_size=env.observation_size,
             horizon=env.task.planning_horizon,
-            hidden_layers=[128, 128],
+            feature_dims=[32, 32, 32],
             rngs=nnx.Rngs(0),
         )
         policy = train(
@@ -34,8 +34,8 @@ if __name__ == "__main__":
             ctrl,
             net,
             log_dir="/tmp/gpc_walker",
-            num_policy_samples=16,
-            num_iters=100,
+            num_policy_samples=64,
+            num_iters=10,
             num_envs=32,
             num_epochs=10,
         )
@@ -46,7 +46,9 @@ if __name__ == "__main__":
         # Load the policy from a file and test it interactively
         print(f"Loading policy from {save_file}")
         policy = Policy.load(save_file)
-        test_interactive(env, policy)
+        test_interactive(
+            env, policy, inference_timestep=0.01, warm_start_level=1.0
+        )
 
     else:
         print(usage)

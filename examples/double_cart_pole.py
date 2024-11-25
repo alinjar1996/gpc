@@ -35,10 +35,10 @@ if __name__ == "__main__":
             net,
             num_policy_samples=64,
             log_dir="/tmp/gpc_double_cart_pole",
-            num_iters=50,
+            num_iters=10,
             num_envs=128,
             num_epochs=10,
-            exploration_noise_level=0.1,
+            exploration_noise_level=0.0,
         )
         policy.save(save_file)
         print(f"Saved policy to {save_file}")
