@@ -29,11 +29,15 @@ def test_interactive(
     task = env.task
 
     # Set up the policy
-    policy = policy.replace(dt=inference_timestep)
-    policy.model.eval()
-    jit_policy = jax.jit(
-        partial(policy.apply, warm_start_level=warm_start_level)
-    )
+    #policy = policy.replace(dt=inference_timestep)
+    #policy.model.eval()
+    #jit_policy = jax.jit(
+    #    partial(policy.apply, warm_start_level=warm_start_level)
+    #)
+    @jax.jit
+    def jit_policy(state, rng):
+        U = policy.optimize(state, rng)
+        return U[0]
 
     # Set up the mujoco simultion
     mj_model = task.mj_model
@@ -68,8 +72,8 @@ def test_interactive(
             # Update the action sequence
             inference_start = time.time()
             rng, policy_rng = jax.random.split(rng)
-            actions = jit_policy(actions, obs, policy_rng)
-            mj_data.ctrl[:] = actions[0]
+            #actions = jit_policy(actions, obs, policy_rng)
+            mj_data.ctrl[:] = jit_policy(mjx_data, policy_rng)
 
             inference_time = time.time() - inference_start
             obs_time = inference_start - st
