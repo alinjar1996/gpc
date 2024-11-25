@@ -26,7 +26,7 @@ if __name__ == "__main__":
             action_size=env.task.model.nu,
             observation_size=env.observation_size,
             horizon=env.task.planning_horizon,
-            hidden_layers=[64, 64],
+            feature_dims=[32, 32],
             rngs=nnx.Rngs(0),
         )
         policy = train(
