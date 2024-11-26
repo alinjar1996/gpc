@@ -122,11 +122,11 @@ class Conv1DBlock(nnx.Module):
 class ConditionalResidualBlock(nnx.Module):
     """A temporal convolutional block with FiLM conditional information.
 
-        -------------------------------------------------------------
-        |                                                           |
-        |  -----------             -----------     -----------      |
-    x ---> | Encoder | --> (+) --> | Dropout | --> | Decoder | --> (+) -->
-           -----------      |      -----------     -----------
+        ---------------------------------------------
+        |                                           |
+        |  -----------             -----------      |
+    x ---> | Encoder | --> (+) --> | Decoder | --> (+) -->
+           -----------      |      -----------
                             |
                        ----------
     y -----------------| Linear |
@@ -158,7 +158,6 @@ class ConditionalResidualBlock(nnx.Module):
         self.linear = nnx.LinearGeneral(
             cond_features, (1, out_features), rngs=rngs
         )
-        self.dropout = nnx.Dropout(rate=0.1, rngs=rngs)
         self.residual = nnx.Conv(
             in_features=in_features,
             out_features=out_features,
@@ -171,7 +170,6 @@ class ConditionalResidualBlock(nnx.Module):
         """Forward pass through the block."""
         z = self.encoder(x)
         z += self.linear(y)
-        z = self.dropout(z)
         z = self.decoder(z)
         return z + self.residual(x)
 

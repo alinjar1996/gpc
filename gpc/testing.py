@@ -37,7 +37,6 @@ def test_interactive(
 
     # Set up the mujoco simultion
     mj_model = task.mj_model
-    mj_model.opt.timestep = 0.005
     mj_data = mujoco.MjData(mj_model)
 
     # Initialize the action sequence
