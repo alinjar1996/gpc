@@ -50,28 +50,17 @@ def simulate_episode(
     psi = ctrl.init_params()
     psi = psi.replace(base_params=psi.base_params.replace(rng=ctrl_rng))
 
-    # Set warm-start levels for the policy samples. All are generated from
-    # scratch except for the last one, which is warm-started.
-    warm_start_levels = jnp.zeros(ctrl.num_policy_samples)
-    warm_start_levels = warm_start_levels.at[-1].set(1.0)
-
-    def _scan_fn(
-        carry: Tuple[SimulatorState, jax.Array, PACParams], t: int
-    ) -> Tuple:
+    def _scan_fn(carry: Tuple[SimulatorState, PACParams], t: int) -> Tuple:
         """Take simulation step, and record all data."""
-        x, U, psi = carry
+        x, psi = carry
 
         # Sample action sequences from the learned policy
+        # TODO: consider warm-starting the policy
         y = env._get_observation(x)
         rng, policy_rng, explore_rng = jax.random.split(psi.base_params.rng, 3)
         policy_rngs = jax.random.split(policy_rng, ctrl.num_policy_samples)
-        Us = jax.vmap(policy.apply, in_axes=(None, None, 0, 0))(
-            U, y, policy_rngs, warm_start_levels
-        )
-
-        # We'll use the action sequence that was warm-started to step the
-        # simulation and warm-start the next iteration
-        U = Us[-1]
+        U = jnp.zeros((env.task.planning_horizon, env.task.model.nu))
+        Us = jax.vmap(policy.apply, in_axes=(None, None, 0))(U, y, policy_rngs)
 
         # Place the samples into the predictive control parameters so they
         # can be used in the predictive control update
@@ -79,27 +68,26 @@ def simulate_episode(
             policy_samples=Us, base_params=psi.base_params.replace(rng=rng)
         )
 
-        # Roll out the action sequences from both the learned policy and from
-        # SPC, then aggregate all of them using the SPC update rule.
-        psi, rollouts = ctrl.optimize(x.data, psi)  # includes Us + SPC samples
+        # Update the action sequence with sampling-based predictive control
+        psi, rollouts = ctrl.optimize(x.data, psi)
         U_star = ctrl.get_action_sequence(psi)
 
         # Record the lowest costs achieved by SPC and the policy
+        # TODO: consider logging something more informative
         costs = jnp.sum(rollouts.costs, axis=1)
         spc_best = jnp.min(costs[: -ctrl.num_policy_samples])
         policy_best = jnp.min(costs[ctrl.num_policy_samples :])
 
         # Step the simulation
         exploration_noise = exploration_noise_level * jax.random.normal(
-            explore_rng, U[0].shape
+            explore_rng, U_star[0].shape
         )
-        x = env.step(x, U[0] + exploration_noise)
+        x = env.step(x, U_star[0] + exploration_noise)
 
-        return (x, U, psi), (y, U_star, spc_best, policy_best)
+        return (x, psi), (y, U_star, spc_best, policy_best)
 
-    U_init = jnp.zeros((env.task.planning_horizon, env.task.model.nu))
     _, (y, U, J_spc, J_policy) = jax.lax.scan(
-        _scan_fn, (x, U_init, psi), jnp.arange(env.episode_length)
+        _scan_fn, (x, psi), jnp.arange(env.episode_length)
     )
 
     return y, U, J_spc, J_policy
