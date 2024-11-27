@@ -62,7 +62,7 @@ def simulate_episode(
         y = env._get_observation(x)
         rng, policy_rng, explore_rng = jax.random.split(psi.base_params.rng, 3)
         policy_rngs = jax.random.split(policy_rng, ctrl.num_policy_samples)
-        warm_start_level = 0.9
+        warm_start_level = 0.0
         Us = jax.vmap(policy.apply, in_axes=(0, None, 0, None))(
             U, y, policy_rngs, warm_start_level
         )
@@ -89,7 +89,7 @@ def simulate_episode(
         policy_best = costs[policy_best_idx]
 
         # Step the simulation
-        u = rollouts.controls[policy_best_idx, 0]
+        u = Us[0, 0]
         exploration_noise = exploration_noise_level * jax.random.normal(
             explore_rng, u.shape
         )
