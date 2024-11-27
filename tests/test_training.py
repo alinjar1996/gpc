@@ -11,7 +11,7 @@ from hydrax.algs import PredictiveSampling
 
 from gpc.architectures import DenoisingMLP
 from gpc.augmented import PolicyAugmentedController
-from gpc.envs import ParticleEnv
+from gpc.envs import ParticleEnv, SimulatorState
 from gpc.policy import Policy
 from gpc.training import fit_policy, simulate_episode, train
 
@@ -43,7 +43,7 @@ def test_simulate() -> None:
     policy = Policy(net, normalizer, env.task.u_min, env.task.u_max)
 
     rng, episode_rng = jax.random.split(rng)
-    y, U, J_spc, J_policy = simulate_episode(
+    y, U, J_spc, J_policy, states = simulate_episode(
         env, ctrl, policy, 0.0, episode_rng
     )
 
@@ -51,6 +51,9 @@ def test_simulate() -> None:
     assert U.shape == (13, 5, 2)
     assert J_spc.shape == (13,)
     assert J_policy.shape == (13,)
+    assert isinstance(states, SimulatorState)
+    assert states.t.shape == (13,)
+    assert states.data.qpos.shape == (13, 2)
 
 
 def test_fit() -> None:
