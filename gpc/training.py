@@ -24,7 +24,7 @@ def simulate_episode(
     policy: Policy,
     exploration_noise_level: float,
     rng: jax.Array,
-) -> Tuple[jax.Array, jax.Array, jax.Array, jax.Array]:
+) -> Tuple[jax.Array, jax.Array, jax.Array, jax.Array, SimulatorState]:
     """Starting from a random initial state, run SPC and record training data.
 
     Args:
@@ -40,6 +40,7 @@ def simulate_episode(
         U: The optimal actions at each time step.
         J_spc: cost of the best action sequence found by SPC at each time step.
         J_policy: cost of the best action sequence found by the policy.
+        states: Vmapped simulator states at each time step.
     """
     rng, ctrl_rng, env_rng = jax.random.split(rng, 3)
 
@@ -84,13 +85,13 @@ def simulate_episode(
         )
         x = env.step(x, U_star[0] + exploration_noise)
 
-        return (x, psi), (y, U_star, spc_best, policy_best)
+        return (x, psi), (y, U_star, spc_best, policy_best, x)
 
-    _, (y, U, J_spc, J_policy) = jax.lax.scan(
+    _, (y, U, J_spc, J_policy, states) = jax.lax.scan(
         _scan_fn, (x, psi), jnp.arange(env.episode_length)
     )
 
-    return y, U, J_spc, J_policy
+    return y, U, J_spc, J_policy, states
 
 
 def fit_policy(
@@ -268,7 +269,9 @@ def train(  # noqa: PLR0915 this is a long function, don't limit to 50 lines
     @nnx.jit
     def jit_simulate(
         policy: Policy, rng: jax.Array
-    ) -> Tuple[jax.Array, jax.Array, jax.Array, jax.Array, jax.Array]:
+    ) -> Tuple[
+        jax.Array, jax.Array, jax.Array, jax.Array, jax.Array, SimulatorState
+    ]:
         """Simulate episodes in parallel.
 
         Args:
@@ -281,15 +284,19 @@ def train(  # noqa: PLR0915 this is a long function, don't limit to 50 lines
             Average cost of SPC's best action sequence.
             Average cost of the policy's best action sequence.
             Fraction of times the policy generated the best action sequence.
+            First four simulation trajectories for visualization.
         """
         rngs = jax.random.split(rng, num_envs)
 
-        y, U, J_spc, J_policy = jax.vmap(
+        y, U, J_spc, J_policy, states = jax.vmap(
             simulate_episode, in_axes=(None, None, None, None, 0)
         )(env, ctrl, policy, exploration_noise_level, rngs)
 
+        # Get the first four simulated trajectories
+        selected_states = jax.tree_map(lambda x: x[:4], states)
+
         frac = jnp.mean(J_policy < J_spc)
-        return y, U, jnp.mean(J_spc), jnp.mean(J_policy), frac
+        return y, U, jnp.mean(J_spc), jnp.mean(J_policy), frac, selected_states
 
     @nnx.jit
     def jit_fit(
@@ -331,9 +338,19 @@ def train(  # noqa: PLR0915 this is a long function, don't limit to 50 lines
         policy.model.eval()
         sim_start = time.time()
         rng, episode_rng = jax.random.split(rng)
-        y, U, J_spc, J_policy, frac = jit_simulate(policy, episode_rng)
+        y, U, J_spc, J_policy, frac, traj = jit_simulate(policy, episode_rng)
         y.block_until_ready()
         sim_time = time.time() - sim_start
+
+        # Render the first few trajectories for visualization
+        # N.B. this uses CPU mujoco's rendering utils, so we need to do it
+        # sequentially and outside a jit-compiled function
+        video_frames = []
+        fps = 10  # TODO: set as a parameter
+        for j in range(4):  # TODO: set 4 as a parameter
+            state_sequence = jax.tree.map(lambda x: x[j], traj)  # noqa: B023
+            video_frames.append(env.render(state_sequence, fps))
+        video_frames = np.stack(video_frames)
 
         # Fit the policy network U = NNet(y) to the data
         policy.model.train()
@@ -369,6 +386,7 @@ def train(  # noqa: PLR0915 this is a long function, don't limit to 50 lines
         tb_writer.add_scalar("sim/policy_best_frac", frac, i)
         tb_writer.add_scalar("fit/loss", loss, i)
         tb_writer.add_scalar("fit/time", fit_time, i)
+        tb_writer.add_video("sim/trajectories", video_frames, i, fps=fps)
         tb_writer.flush()
 
     return policy
