@@ -169,7 +169,7 @@ class ConditionalResidualBlock(nnx.Module):
     def __call__(self, x: jax.Array, y: jax.Array) -> jax.Array:
         """Forward pass through the block."""
         z = self.encoder(x)
-        z += self.linear(y)
+        z += nnx.swish(self.linear(y))
         z = self.decoder(z)
         return z + self.residual(x)
 
