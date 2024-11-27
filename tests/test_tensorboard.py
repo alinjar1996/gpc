@@ -8,7 +8,7 @@ fname = "/tmp/tb_test/" + time_str
 writer = SummaryWriter(fname)
 
 
-batch = 2
+batch = 4
 time = 64
 channels = 3
 height = 64
@@ -22,7 +22,7 @@ for step in range(10):
             for i in range(height):
                 for j in range(width):
                     video[b, t, step % 3, i, j] = (
-                        b / 2 * np.sin(t / 10.0 + i / 10.0 + j / 10.0)
+                        b / batch * np.sin(t / 10.0 + i / 10.0 + j / 10.0)
                         + np.random.randn() * 0.1
                     )
 
