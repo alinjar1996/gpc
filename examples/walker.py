@@ -21,7 +21,7 @@ if __name__ == "__main__":
 
     if sys.argv[1] == "train":
         # Train the policy and save it to a file
-        ctrl = PredictiveSampling(env.task, num_samples=64, noise_level=0.3)
+        ctrl = PredictiveSampling(env.task, num_samples=128, noise_level=0.3)
         net = DenoisingCNN(
             action_size=env.task.model.nu,
             observation_size=env.observation_size,
@@ -34,10 +34,13 @@ if __name__ == "__main__":
             ctrl,
             net,
             log_dir="/tmp/gpc_walker",
-            num_policy_samples=64,
-            num_iters=10,
-            num_envs=32,
+            num_policy_samples=16,
+            num_iters=20,
+            num_envs=128,
             num_epochs=10,
+            checkpoint_every=5,
+            batch_size=2048,
+            exploration_noise_level=0.1,
         )
         policy.save(save_file)
         print(f"Saved policy to {save_file}")
@@ -47,7 +50,7 @@ if __name__ == "__main__":
         print(f"Loading policy from {save_file}")
         policy = Policy.load(save_file)
         test_interactive(
-            env, policy, inference_timestep=0.01, warm_start_level=1.0
+            env, policy, inference_timestep=0.01, warm_start_level=0.9
         )
 
     else:
