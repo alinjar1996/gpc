@@ -37,6 +37,7 @@ if __name__ == "__main__":
             log_dir="/tmp/gpc_pendulum",
             num_iters=10,
             num_envs=128,
+            num_videos=1,
         )
         policy.save(save_file)
         print(f"Saved policy to {save_file}")

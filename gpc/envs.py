@@ -2,6 +2,8 @@ from abc import ABC, abstractmethod
 
 import jax
 import jax.numpy as jnp
+import mujoco
+import numpy as np
 from flax.struct import dataclass
 from hydrax.task_base import Task
 from hydrax.tasks.cart_pole import CartPole
@@ -34,6 +36,7 @@ class TrainingEnv(ABC):
         """Initialize the training environment."""
         self.task = task
         self.episode_length = episode_length
+        self.renderer = mujoco.Renderer(self.task.mj_model)
 
     def init_state(self, rng: jax.Array) -> SimulatorState:
         """Initialize the simulator state."""
@@ -41,6 +44,34 @@ class TrainingEnv(ABC):
             data=mjx.make_data(self.task.model), t=0, rng=rng
         )
         return self._reset_state(state)
+
+    def render(self, states: SimulatorState, fps: int = 10) -> np.ndarray:
+        """Render video frames from a state trajectory.
+
+        Note that this is not a pure jax function, and should only be used for
+        visualization.
+
+        Args:
+            states: Sequence of states (vmapped over time).
+            fps: The frames per second for the video.
+
+        Returns:
+            A sequence of video frames, with shape (T, C, H, W).
+        """
+        sim_dt = self.task.model.opt.timestep
+        render_dt = 1.0 / fps
+        render_every = int(round(render_dt / sim_dt))
+        steps = np.arange(0, len(states.t), render_every)
+
+        frames = []
+        for i in steps:
+            mjx_data = jax.tree.map(lambda x: x[i], states.data)  # noqa: B023
+            mj_data = mjx.get_data(self.task.mj_model, mjx_data)
+            self.renderer.update_scene(mj_data)
+            pixels = self.renderer.render()  # H, W, C
+            frames.append(pixels.transpose(2, 0, 1))  # C, H, W
+
+        return np.stack(frames)
 
     @abstractmethod
     def reset(self, data: mjx.Data, rng: jax.Array) -> mjx.Data:
