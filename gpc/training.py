@@ -192,6 +192,8 @@ def train(  # noqa: PLR0915 this is a long function, don't limit to 50 lines
     checkpoint_every: int = 10,
     exploration_noise_level: float = 0.0,
     normalize_observations: bool = True,
+    num_videos: int = 4,
+    video_fps: int = 10,
 ) -> None:
     """Train a generative predictive controller.
 
@@ -210,6 +212,8 @@ def train(  # noqa: PLR0915 this is a long function, don't limit to 50 lines
         exploration_noise_level: Standard deviation of the gaussian noise added
                                  to each action during episode simulation.
         normalize_observations: Flag for observation normalization.
+        num_videos: Number of videos to render for visualization.
+        video_fps: Frames per second for rendered videos.
 
     """
     rng = jax.random.key(0)
@@ -292,8 +296,8 @@ def train(  # noqa: PLR0915 this is a long function, don't limit to 50 lines
             simulate_episode, in_axes=(None, None, None, None, 0)
         )(env, ctrl, policy, exploration_noise_level, rngs)
 
-        # Get the first four simulated trajectories
-        selected_states = jax.tree_map(lambda x: x[:4], states)
+        # Get the first few simulated trajectories
+        selected_states = jax.tree_map(lambda x: x[:num_videos], states)
 
         frac = jnp.mean(J_policy < J_spc)
         return y, U, jnp.mean(J_spc), jnp.mean(J_policy), frac, selected_states
@@ -345,12 +349,14 @@ def train(  # noqa: PLR0915 this is a long function, don't limit to 50 lines
         # Render the first few trajectories for visualization
         # N.B. this uses CPU mujoco's rendering utils, so we need to do it
         # sequentially and outside a jit-compiled function
-        video_frames = []
-        fps = 10  # TODO: set as a parameter
-        for j in range(4):  # TODO: set 4 as a parameter
-            state_sequence = jax.tree.map(lambda x: x[j], traj)  # noqa: B023
-            video_frames.append(env.render(state_sequence, fps))
-        video_frames = np.stack(video_frames)
+        if num_videos > 0:
+            render_start = time.time()
+            video_frames = []
+            for j in range(num_videos):
+                states = jax.tree.map(lambda x: x[j], traj)  # noqa: B023
+                video_frames.append(env.render(states, video_fps))
+            video_frames = np.stack(video_frames)
+            render_time = time.time() - render_start
 
         # Fit the policy network U = NNet(y) to the data
         policy.model.train()
@@ -386,7 +392,11 @@ def train(  # noqa: PLR0915 this is a long function, don't limit to 50 lines
         tb_writer.add_scalar("sim/policy_best_frac", frac, i)
         tb_writer.add_scalar("fit/loss", loss, i)
         tb_writer.add_scalar("fit/time", fit_time, i)
-        tb_writer.add_video("sim/trajectories", video_frames, i, fps=fps)
+        if num_videos > 0:
+            tb_writer.add_scalar("render/time", render_time, i)
+            tb_writer.add_video(
+                "render/trajectories", video_frames, i, fps=video_fps
+            )
         tb_writer.flush()
 
     return policy
