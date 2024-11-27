@@ -192,7 +192,7 @@ def train(  # noqa: PLR0915 this is a long function, don't limit to 50 lines
     checkpoint_every: int = 10,
     exploration_noise_level: float = 0.0,
     normalize_observations: bool = True,
-    num_videos: int = 4,
+    num_videos: int = 2,
     video_fps: int = 10,
 ) -> None:
     """Train a generative predictive controller.
