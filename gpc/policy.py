@@ -81,7 +81,10 @@ class Policy:
 
         # Set the initial sample
         warm_start_level = jnp.clip(warm_start_level, 0.0, 1.0)
-        noise = jax.random.normal(rng, prev.shape)
+        # noise = jax.random.normal(rng, prev.shape)
+        noise = jax.random.uniform(
+            rng, prev.shape, minval=self.u_min, maxval=self.u_max
+        )
         U = warm_start_level * prev + (1 - warm_start_level) * noise
 
         def _step(args: Tuple[jax.Array, float]) -> Tuple[jax.Array, float]:

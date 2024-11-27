@@ -40,7 +40,7 @@ if __name__ == "__main__":
             num_epochs=100,
             batch_size=1024,
             learning_rate=1e-3,
-            exploration_noise_level=0.1,
+            exploration_noise_level=0.0,
             checkpoint_every=5,
         )
         policy.save(save_file)

@@ -15,7 +15,7 @@ def test_interactive(
     env: TrainingEnv,
     policy: Policy,
     inference_timestep: float = 0.1,
-    warm_start_level: float = 0.9,
+    warm_start_level: float = 1.0,
 ) -> None:
     """Test a GPC policy with an interactive simulation.
 

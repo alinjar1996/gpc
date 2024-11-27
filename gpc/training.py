@@ -162,7 +162,10 @@ def fit_policy(
 
         # Sample noise and time steps for the flow matching targets
         rng, noise_rng, t_rng = jax.random.split(rng, 3)
-        noise = jax.random.normal(noise_rng, batch_act.shape)
+        # noise = jax.random.normal(noise_rng, batch_act.shape)  # DEBUG
+        noise = jax.random.uniform(
+            noise_rng, batch_act.shape, minval=-1, maxval=1
+        )
         t = jax.random.uniform(t_rng, (batch_size, 1))
 
         # Compute the loss and its gradient
