@@ -201,13 +201,6 @@ class DoubleCartPoleEnv(TrainingEnv):
 
         return data.replace(qpos=qpos, qvel=qvel)
 
-    def episode_over(self, state: SimulatorState) -> bool:
-        """Terminate the episode early if the velocities get too large."""
-        return jnp.logical_or(
-            state.t >= self.episode_length,
-            jnp.any(jnp.abs(state.data.qvel) > 10.0),
-        )
-
     def get_obs(self, data: mjx.Data) -> jax.Array:
         """Observe the velocity and sin/cos of the angles."""
         p = data.qpos[0]
