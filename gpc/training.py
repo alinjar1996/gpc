@@ -80,11 +80,16 @@ def simulate_episode(
         # Record the lowest costs achieved by SPC and the policy
         # TODO: consider logging something more informative
         costs = jnp.sum(rollouts.costs, axis=1)
-        spc_best = jnp.min(costs[: -ctrl.num_policy_samples])
-        policy_best = jnp.min(costs[ctrl.num_policy_samples :])
+        spc_best_idx = jnp.argmin(costs[: -ctrl.num_policy_samples])
+        policy_best_idx = (
+            jnp.argmin(costs[ctrl.num_policy_samples :])
+            + ctrl.num_policy_samples
+        )
+        spc_best = costs[spc_best_idx]
+        policy_best = costs[policy_best_idx]
 
         # Step the simulation
-        u = Us[0, 0]
+        u = rollouts.controls[policy_best_idx, 0]
         exploration_noise = exploration_noise_level * jax.random.normal(
             explore_rng, u.shape
         )
