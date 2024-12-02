@@ -51,17 +51,21 @@ def simulate_episode(
     psi = ctrl.init_params()
     psi = psi.replace(base_params=psi.base_params.replace(rng=ctrl_rng))
 
-    def _scan_fn(carry: Tuple[SimulatorState, PACParams], t: int) -> Tuple:
+    def _scan_fn(
+        carry: Tuple[SimulatorState, jax.Array, PACParams], t: int
+    ) -> Tuple:
         """Take simulation step, and record all data."""
-        x, psi = carry
+        x, U, psi = carry
 
         # Sample action sequences from the learned policy
         # TODO: consider warm-starting the policy
         y = env._get_observation(x)
         rng, policy_rng, explore_rng = jax.random.split(psi.base_params.rng, 3)
         policy_rngs = jax.random.split(policy_rng, ctrl.num_policy_samples)
-        U = jnp.zeros((env.task.planning_horizon, env.task.model.nu))
-        Us = jax.vmap(policy.apply, in_axes=(None, None, 0))(U, y, policy_rngs)
+        warm_start_level = 0.0
+        Us = jax.vmap(policy.apply, in_axes=(0, None, 0, None))(
+            U, y, policy_rngs, warm_start_level
+        )
 
         # Place the samples into the predictive control parameters so they
         # can be used in the predictive control update
@@ -76,19 +80,30 @@ def simulate_episode(
         # Record the lowest costs achieved by SPC and the policy
         # TODO: consider logging something more informative
         costs = jnp.sum(rollouts.costs, axis=1)
-        spc_best = jnp.min(costs[: -ctrl.num_policy_samples])
-        policy_best = jnp.min(costs[ctrl.num_policy_samples :])
+        spc_best_idx = jnp.argmin(costs[: -ctrl.num_policy_samples])
+        policy_best_idx = (
+            jnp.argmin(costs[ctrl.num_policy_samples :])
+            + ctrl.num_policy_samples
+        )
+        spc_best = costs[spc_best_idx]
+        policy_best = costs[policy_best_idx]
 
         # Step the simulation
+        u = Us[0, 0]
         exploration_noise = exploration_noise_level * jax.random.normal(
-            explore_rng, U_star[0].shape
+            explore_rng, u.shape
         )
-        x = env.step(x, U_star[0] + exploration_noise)
+        x = env.step(x, u + exploration_noise)
 
-        return (x, psi), (y, U_star, spc_best, policy_best, x)
+        return (x, Us, psi), (y, U_star, spc_best, policy_best, x)
 
+    rng, u_rng = jax.random.split(rng)
+    U = jax.random.normal(
+        u_rng,
+        (ctrl.num_policy_samples, env.task.planning_horizon, env.task.model.nu),
+    )
     _, (y, U, J_spc, J_policy, states) = jax.lax.scan(
-        _scan_fn, (x, psi), jnp.arange(env.episode_length)
+        _scan_fn, (x, U, psi), jnp.arange(env.episode_length)
     )
 
     return y, U, J_spc, J_policy, states

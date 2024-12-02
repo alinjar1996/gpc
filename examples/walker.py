@@ -35,8 +35,8 @@ if __name__ == "__main__":
             net,
             log_dir="/tmp/gpc_walker",
             num_policy_samples=16,
-            num_iters=10,
-            num_envs=32,
+            num_iters=20,
+            num_envs=128,
             num_epochs=10,
         )
         policy.save(save_file)

@@ -3,7 +3,7 @@ import sys
 from flax import nnx
 from hydrax.algs import PredictiveSampling
 
-from gpc.architectures import DenoisingCNN
+from gpc.architectures import DenoisingMLP
 from gpc.envs import PendulumEnv
 from gpc.policy import Policy
 from gpc.testing import test_interactive
@@ -21,12 +21,12 @@ if __name__ == "__main__":
 
     if sys.argv[1] == "train":
         # Train the policy and save it to a file
-        ctrl = PredictiveSampling(env.task, num_samples=32, noise_level=0.1)
-        net = DenoisingCNN(
+        ctrl = PredictiveSampling(env.task, num_samples=64, noise_level=0.1)
+        net = DenoisingMLP(
             action_size=env.task.model.nu,
             observation_size=env.observation_size,
             horizon=env.task.planning_horizon,
-            feature_dims=[32, 32],
+            hidden_layers=[32, 32],
             rngs=nnx.Rngs(0),
         )
         policy = train(
@@ -35,9 +35,10 @@ if __name__ == "__main__":
             net,
             num_policy_samples=16,
             log_dir="/tmp/gpc_pendulum",
-            num_iters=10,
+            num_epochs=10,
+            num_iters=30,
             num_envs=128,
-            num_videos=1,
+            num_videos=2,
         )
         policy.save(save_file)
         print(f"Saved policy to {save_file}")

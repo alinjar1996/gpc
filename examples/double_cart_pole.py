@@ -3,7 +3,7 @@ import sys
 from flax import nnx
 from hydrax.algs import PredictiveSampling
 
-from gpc.architectures import DenoisingCNN
+from gpc.architectures import DenoisingMLP
 from gpc.envs import DoubleCartPoleEnv
 from gpc.policy import Policy
 from gpc.testing import test_interactive
@@ -21,24 +21,25 @@ if __name__ == "__main__":
 
     if sys.argv[1] == "train":
         # Train the policy and save it to a file
-        ctrl = PredictiveSampling(env.task, num_samples=16, noise_level=0.3)
-        net = DenoisingCNN(
+        ctrl = PredictiveSampling(env.task, num_samples=64, noise_level=0.3)
+        net = DenoisingMLP(
             action_size=env.task.model.nu,
             observation_size=env.observation_size,
             horizon=env.task.planning_horizon,
-            feature_dims=(32, 32, 32),
+            hidden_layers=(128, 128),
             rngs=nnx.Rngs(0),
         )
         policy = train(
             env,
             ctrl,
             net,
-            num_policy_samples=16,
+            num_policy_samples=32,
             log_dir="/tmp/gpc_double_cart_pole",
-            num_iters=10,
-            num_envs=128,
-            num_epochs=10,
-            exploration_noise_level=0.0,
+            num_iters=50,
+            num_envs=256,
+            num_epochs=100,
+            checkpoint_every=5,
+            num_videos=4,
         )
         policy.save(save_file)
         print(f"Saved policy to {save_file}")
