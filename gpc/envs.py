@@ -10,6 +10,7 @@ from hydrax.tasks.cart_pole import CartPole
 from hydrax.tasks.double_cart_pole import DoubleCartPole
 from hydrax.tasks.particle import Particle
 from hydrax.tasks.pendulum import Pendulum
+from hydrax.tasks.pusht import PushT
 from hydrax.tasks.walker import Walker
 from mujoco import mjx
 
@@ -90,6 +91,7 @@ class TrainingEnv(ABC):
         """Reset the simulator state to start a new episode."""
         rng, reset_rng = jax.random.split(state.rng)
         data = self.reset(state.data, reset_rng)
+        data = mjx.forward(self.task.model, data)  # update sensor data
         return SimulatorState(data=data, t=0, rng=rng)
 
     def _get_observation(self, state: SimulatorState) -> jax.Array:
@@ -283,3 +285,48 @@ class WalkerEnv(TrainingEnv):
     def observation_size(self) -> int:
         """The size of the observation space."""
         return 17
+
+
+class PushTEnv(TrainingEnv):
+    """Training environment for the pusher-T task."""
+
+    def __init__(self, episode_length: int) -> None:
+        """Set up the walker training environment."""
+        super().__init__(task=PushT(), episode_length=episode_length)
+
+    def reset(self, data: mjx.Data, rng: jax.Array) -> mjx.Data:
+        """Reset the simulator to start a new episode."""
+        rng, pos_rng, vel_rng, goal_pos_rng, goal_ori_rng = jax.random.split(
+            rng, 5
+        )
+
+        # Random configuration for the pusher and the T
+        q_min = jnp.array([-0.2, -0.2, -jnp.pi, -0.2, -0.2])
+        q_max = jnp.array([0.2, 0.2, jnp.pi, 0.2, 0.2])
+        qpos = jax.random.uniform(pos_rng, (5,), minval=q_min, maxval=q_max)
+
+        # Random velocity for the pusher and the T
+        qvel = jax.random.uniform(vel_rng, (5,), minval=-0.1, maxval=0.1)
+
+        # Random position for the goal
+        goal = jax.random.uniform(goal_pos_rng, (2,), minval=-0.2, maxval=0.2)
+        mocap_pos = data.mocap_pos.at[0, 0:2].set(goal)
+
+        # Random orientation for the goal
+        theta = jax.random.uniform(
+            goal_ori_rng, (), minval=-jnp.pi, maxval=jnp.pi
+        )
+        mocap_quat = jnp.array([[jnp.cos(theta / 2), 0, 0, jnp.sin(theta / 2)]])
+
+        return data.replace(
+            qpos=qpos, qvel=qvel, mocap_pos=mocap_pos, mocap_quat=mocap_quat
+        )
+
+    def get_obs(self, data: mjx.Data) -> jax.Array:
+        """Observe everything in the state."""
+        return jnp.concatenate([data.qpos, data.qvel])
+
+    @property
+    def observation_size(self) -> int:
+        """The size of the observation space."""
+        return 10
