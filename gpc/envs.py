@@ -301,11 +301,11 @@ class PushTEnv(TrainingEnv):
         )
 
         # Random configuration for the pusher and the T
-        q_min = jnp.array([-0.1, -0.1, -jnp.pi, -0.1, -0.1])
-        q_max = jnp.array([0.1, 0.1, jnp.pi, 0.1, 0.1])
+        q_min = jnp.array([-0.1, -0.1, -jnp.pi, -0.2, -0.2])
+        q_max = jnp.array([0.1, 0.1, jnp.pi, 0.2, 0.2])
         qpos = jax.random.uniform(pos_rng, (5,), minval=q_min, maxval=q_max)
 
-        # Random velocity for the pusher and the T
+        # Velocities fixed at zero
         qvel = jax.random.uniform(vel_rng, (5,), minval=-0.0, maxval=0.0)
 
         # Goal position and orientation fixed at zero
