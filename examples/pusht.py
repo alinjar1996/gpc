@@ -35,7 +35,7 @@ if __name__ == "__main__":
             net,
             num_policy_samples=32,
             log_dir="/tmp/gpc_pusht",
-            num_iters=100,
+            num_iters=20,
             num_envs=256,
             num_epochs=100,
             batch_size=1024,
@@ -48,7 +48,7 @@ if __name__ == "__main__":
         # Load the policy from a file and test it interactively
         print(f"Loading policy from {save_file}")
         policy = Policy.load(save_file)
-        test_interactive(env, policy, warm_start_level=1.0)
+        test_interactive(env, policy, warm_start_level=0.5)
 
     else:
         print(usage)
