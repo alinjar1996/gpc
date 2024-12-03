@@ -301,21 +301,17 @@ class PushTEnv(TrainingEnv):
         )
 
         # Random configuration for the pusher and the T
-        q_min = jnp.array([-0.2, -0.2, -jnp.pi, -0.2, -0.2])
-        q_max = jnp.array([0.2, 0.2, jnp.pi, 0.2, 0.2])
+        q_min = jnp.array([-0.1, -0.1, -jnp.pi, -0.1, -0.1])
+        q_max = jnp.array([0.1, 0.1, jnp.pi, 0.1, 0.1])
         qpos = jax.random.uniform(pos_rng, (5,), minval=q_min, maxval=q_max)
 
         # Random velocity for the pusher and the T
-        qvel = jax.random.uniform(vel_rng, (5,), minval=-0.1, maxval=0.1)
+        qvel = jax.random.uniform(vel_rng, (5,), minval=-0.0, maxval=0.0)
 
-        # Random position for the goal
-        goal = jax.random.uniform(goal_pos_rng, (2,), minval=-0.2, maxval=0.2)
+        # Goal position and orientation fixed at zero
+        goal = jax.random.uniform(goal_pos_rng, (2,), minval=0.0, maxval=0.0)
         mocap_pos = data.mocap_pos.at[0, 0:2].set(goal)
-
-        # Random orientation for the goal
-        theta = jax.random.uniform(
-            goal_ori_rng, (), minval=-jnp.pi, maxval=jnp.pi
-        )
+        theta = jax.random.uniform(goal_ori_rng, (), minval=0.0, maxval=0.0)
         mocap_quat = jnp.array([[jnp.cos(theta / 2), 0, 0, jnp.sin(theta / 2)]])
 
         return data.replace(
@@ -323,10 +319,13 @@ class PushTEnv(TrainingEnv):
         )
 
     def get_obs(self, data: mjx.Data) -> jax.Array:
-        """Observe everything in the state."""
-        return jnp.concatenate([data.qpos, data.qvel])
+        """Observe positions relative to the target."""
+        pusher_pos = data.qpos[-2:]
+        block_pos = data.qpos[0:2]
+        block_ori = self.task._get_orientation_err(data)[0:1]
+        return jnp.concatenate([pusher_pos, block_pos, block_ori])
 
     @property
     def observation_size(self) -> int:
         """The size of the observation space."""
-        return 10
+        return 5
