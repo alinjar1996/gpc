@@ -21,7 +21,7 @@ if __name__ == "__main__":
 
     if sys.argv[1] == "train":
         # Train the policy and save it to a file
-        ctrl = PredictiveSampling(env.task, num_samples=128, noise_level=0.5)
+        ctrl = PredictiveSampling(env.task, num_samples=128, noise_level=0.4)
         net = DenoisingCNN(
             action_size=env.task.model.nu,
             observation_size=env.observation_size,
