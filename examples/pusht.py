@@ -38,7 +38,7 @@ if __name__ == "__main__":
             num_iters=20,
             num_envs=128,
             num_epochs=10,
-            checkpoint_every=1,
+            checkpoint_every=5,
         )
         policy.save(save_file)
         print(f"Saved policy to {save_file}")

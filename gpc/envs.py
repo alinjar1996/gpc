@@ -309,11 +309,9 @@ class PushTEnv(TrainingEnv):
         qvel = jax.random.uniform(vel_rng, (5,), minval=-0.0, maxval=0.0)
 
         # Goal position and orientation fixed at zero
-        goal = jax.random.uniform(goal_pos_rng, (2,), minval=-0.2, maxval=0.2)
+        goal = jax.random.uniform(goal_pos_rng, (2,), minval=-0.0, maxval=0.0)
         mocap_pos = data.mocap_pos.at[0, 0:2].set(goal)
-        theta = jax.random.uniform(
-            goal_ori_rng, (), minval=-jnp.pi, maxval=jnp.pi
-        )
+        theta = jax.random.uniform(goal_ori_rng, (), minval=0.0, maxval=0.0)
         mocap_quat = jnp.array([[jnp.cos(theta / 2), 0, 0, jnp.sin(theta / 2)]])
 
         return data.replace(
@@ -324,11 +322,10 @@ class PushTEnv(TrainingEnv):
         """Observe positions relative to the target."""
         pusher_pos = data.qpos[-2:]
         block_pos = data.qpos[0:2]
-        target_pos = data.mocap_pos[0, 0:2]
         block_ori = self.task._get_orientation_err(data)[0:1]
-        return jnp.concatenate([pusher_pos, block_pos, target_pos, block_ori])
+        return jnp.concatenate([pusher_pos, block_pos, block_ori])
 
     @property
     def observation_size(self) -> int:
         """The size of the observation space."""
-        return 7
+        return 5
