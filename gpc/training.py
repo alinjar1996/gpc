@@ -98,9 +98,11 @@ def simulate_episode(
         return (x, Us, psi), (y, U_star, spc_best, policy_best, x)
 
     rng, u_rng = jax.random.split(rng)
-    U = jax.random.normal(
+    U = jax.random.uniform(
         u_rng,
         (ctrl.num_policy_samples, env.task.planning_horizon, env.task.model.nu),
+        minval=env.task.u_min,
+        maxval=env.task.u_max,
     )
     _, (y, U, J_spc, J_policy, states) = jax.lax.scan(
         _scan_fn, (x, U, psi), jnp.arange(env.episode_length)
@@ -116,9 +118,14 @@ def fit_policy(
     optimizer: nnx.Optimizer,
     batch_size: int,
     num_epochs: int,
+    u_min: jax.Array,
+    u_max: jax.Array,
     rng: jax.Array,
 ) -> jax.Array:
     """Fit a flow matching model to the data.
+
+    This model generates samples U ~ π(U|y) from the policy by flowing from
+    U ~ Uniform(u_min, u_max) to the target action sequence U*.
 
     Args:
         observations: The (normalized) observations y.
@@ -127,6 +134,8 @@ def fit_policy(
         optimizer: The optimizer (e.g. Adam).
         batch_size: The batch size.
         num_epochs: The number of epochs.
+        u_min: The minimum action value u, used for the proposal distribution.
+        u_max: The maximum action value u, used for the proposal distribution.
         rng: The random number generator key.
 
     Returns:
@@ -166,7 +175,9 @@ def fit_policy(
 
         # Sample noise and time steps for the flow matching targets
         rng, noise_rng, t_rng = jax.random.split(rng, 3)
-        noise = jax.random.normal(noise_rng, batch_act.shape)
+        noise = jax.random.uniform(
+            noise_rng, batch_act.shape, minval=u_min, maxval=u_max
+        )
         t = jax.random.uniform(t_rng, (batch_size, 1))
 
         # Compute the loss and its gradient
@@ -232,6 +243,10 @@ def train(  # noqa: PLR0915 this is a long function, don't limit to 50 lines
 
     """
     rng = jax.random.key(0)
+
+    # Check that the task has finite input bounds
+    assert jnp.all(jnp.isfinite(env.task.u_min))
+    assert jnp.all(jnp.isfinite(env.task.u_max))
 
     # Print some information about the training setup
     episode_seconds = env.episode_length * env.task.model.opt.timestep
@@ -347,7 +362,15 @@ def train(  # noqa: PLR0915 this is a long function, don't limit to 50 lines
 
         # Do the regression
         return fit_policy(
-            y, U, policy.model, optimizer, batch_size, num_epochs, rng
+            y,
+            U,
+            policy.model,
+            optimizer,
+            batch_size,
+            num_epochs,
+            env.task.u_min,
+            env.task.u_max,
+            rng,
         )
 
     train_start = datetime.now()
