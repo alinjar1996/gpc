@@ -365,6 +365,8 @@ def train(  # noqa: PLR0915 this is a long function, don't limit to 50 lines
         y = policy.normalizer(y, use_running_average=not normalize_observations)
 
         # Do the regression
+        # N.B. a proposal distribution slightly wider than ie input limits
+        # (u_min, u_max) seems to help with training stability
         return fit_policy(
             y,
             U,
@@ -372,8 +374,8 @@ def train(  # noqa: PLR0915 this is a long function, don't limit to 50 lines
             optimizer,
             batch_size,
             num_epochs,
-            env.task.u_min,
-            env.task.u_max,
+            env.task.u_min * 1.1,
+            env.task.u_max * 1.1,
             rng,
         )
 
