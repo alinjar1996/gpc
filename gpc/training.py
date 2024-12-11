@@ -117,8 +117,12 @@ def fit_policy(
     batch_size: int,
     num_epochs: int,
     rng: jax.Array,
+    sigma_min: float = 1e-2,
 ) -> jax.Array:
     """Fit a flow matching model to the data.
+
+    This model generates samples U ~ π(U|y) from the policy by flowing from
+    U ~ N(0, I) to the target action sequence U*.
 
     Args:
         observations: The (normalized) observations y.
@@ -128,6 +132,8 @@ def fit_policy(
         batch_size: The batch size.
         num_epochs: The number of epochs.
         rng: The random number generator key.
+        sigma_min: Target distribution width for flow matching, see
+                   https://arxiv.org/pdf/2210.02747, eq (20-23).
 
     Returns:
         The loss from the last epoch.
@@ -145,8 +151,9 @@ def fit_policy(
         t: jax.Array,
     ) -> jax.Array:
         """Compute the flow-matching loss."""
-        noised_action = t[..., None] * act + (1 - t[..., None]) * noise
-        target = act - noise
+        alpha = 1.0 - sigma_min
+        noised_action = t[..., None] * act + (1 - alpha * t[..., None]) * noise
+        target = act - alpha * noise
         pred = model(noised_action, obs, t)
         return jnp.mean(jnp.square(pred - target))
 
@@ -232,6 +239,10 @@ def train(  # noqa: PLR0915 this is a long function, don't limit to 50 lines
 
     """
     rng = jax.random.key(0)
+
+    # Check that the task has finite input bounds
+    assert jnp.all(jnp.isfinite(env.task.u_min))
+    assert jnp.all(jnp.isfinite(env.task.u_max))
 
     # Print some information about the training setup
     episode_seconds = env.episode_length * env.task.model.opt.timestep
@@ -347,7 +358,13 @@ def train(  # noqa: PLR0915 this is a long function, don't limit to 50 lines
 
         # Do the regression
         return fit_policy(
-            y, U, policy.model, optimizer, batch_size, num_epochs, rng
+            y,
+            U,
+            policy.model,
+            optimizer,
+            batch_size,
+            num_epochs,
+            rng,
         )
 
     train_start = datetime.now()

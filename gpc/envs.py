@@ -161,14 +161,15 @@ class PendulumEnv(TrainingEnv):
 
     def __init__(self, episode_length: int) -> None:
         """Set up the pendulum training environment."""
-        super().__init__(task=Pendulum(), episode_length=episode_length)
-        # TODO: set planning horizon in task constructor
-        self.task.planning_horizon = 10
+        super().__init__(
+            task=Pendulum(planning_horizon=5),
+            episode_length=episode_length,
+        )
 
     def reset(self, data: mjx.Data, rng: jax.Array) -> mjx.Data:
         """Reset the simulator to start a new episode."""
         rng, pos_rng, vel_rng = jax.random.split(rng, 3)
-        qpos = jax.random.uniform(pos_rng, (1,), minval=-0.1, maxval=0.1)
+        qpos = jax.random.uniform(pos_rng, (1,), minval=-jnp.pi, maxval=jnp.pi)
         qvel = jax.random.uniform(vel_rng, (1,), minval=-8.0, maxval=8.0)
         return data.replace(qpos=qpos, qvel=qvel)
 
