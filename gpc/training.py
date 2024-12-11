@@ -121,6 +121,7 @@ def fit_policy(
     u_min: jax.Array,
     u_max: jax.Array,
     rng: jax.Array,
+    sigma_min: float = 1e-2,
 ) -> jax.Array:
     """Fit a flow matching model to the data.
 
@@ -137,6 +138,8 @@ def fit_policy(
         u_min: The minimum action value u, used for the proposal distribution.
         u_max: The maximum action value u, used for the proposal distribution.
         rng: The random number generator key.
+        sigma_min: Target distribution width for flow matching, see
+                   https://arxiv.org/pdf/2210.02747, eq (20-23).
 
     Returns:
         The loss from the last epoch.
@@ -154,8 +157,9 @@ def fit_policy(
         t: jax.Array,
     ) -> jax.Array:
         """Compute the flow-matching loss."""
-        noised_action = t[..., None] * act + (1 - t[..., None]) * noise
-        target = act - noise
+        alpha = 1.0 - sigma_min
+        noised_action = t[..., None] * act + (1 - alpha * t[..., None]) * noise
+        target = act - alpha * noise
         pred = model(noised_action, obs, t)
         return jnp.mean(jnp.square(pred - target))
 
