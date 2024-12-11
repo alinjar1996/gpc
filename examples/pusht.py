@@ -1,5 +1,6 @@
 import sys
 
+import mujoco
 from flax import nnx
 from hydrax.algs import PredictiveSampling
 
@@ -47,7 +48,9 @@ if __name__ == "__main__":
         # Load the policy from a file and test it interactively
         print(f"Loading policy from {save_file}")
         policy = Policy.load(save_file)
-        test_interactive(env, policy)
+        mj_data = mujoco.MjData(env.task.mj_model)
+        mj_data.qpos[:] = [0.1, 0.1, 1.5, 0.0, 0.0]  # set the initial state
+        test_interactive(env, policy, mj_data)
 
     else:
         print(usage)
