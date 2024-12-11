@@ -8,6 +8,7 @@ from flax.struct import dataclass
 from hydrax.task_base import Task
 from hydrax.tasks.cart_pole import CartPole
 from hydrax.tasks.double_cart_pole import DoubleCartPole
+from hydrax.tasks.humanoid import Humanoid
 from hydrax.tasks.particle import Particle
 from hydrax.tasks.pendulum import Pendulum
 from hydrax.tasks.pusht import PushT
@@ -330,3 +331,31 @@ class PushTEnv(TrainingEnv):
     def observation_size(self) -> int:
         """The size of the observation space."""
         return 5
+
+
+class HumanoidEnv(TrainingEnv):
+    """Training environment for humanoid (Unitree G1) standup."""
+
+    def __init__(self, episode_length: int) -> None:
+        """Set up the walker training environment."""
+        super().__init__(task=Humanoid(), episode_length=episode_length)
+
+    def reset(self, data: mjx.Data, rng: jax.Array) -> mjx.Data:
+        """Reset the simulator to start a new episode."""
+        rng, pos_rng, vel_rng = jax.random.split(rng, 3)
+
+        qpos = self.task.qstand + 0.01 * jax.random.normal(
+            pos_rng, (self.task.model.nq,)
+        )
+        qvel = 0.01 * jax.random.normal(vel_rng, (self.task.model.nv,))
+
+        return data.replace(qpos=qpos, qvel=qvel)
+
+    def get_obs(self, data: mjx.Data) -> jax.Array:
+        """Observe everything except the x/y position."""
+        return jnp.concatenate([data.qpos[2:], data.qvel])
+
+    @property
+    def observation_size(self) -> int:
+        """The size of the observation space."""
+        return 57

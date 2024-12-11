@@ -16,6 +16,7 @@ def test_interactive(
     policy: Policy,
     mj_data: mujoco.MjData = None,
     inference_timestep: float = 0.1,
+    sim_timestep: float = None,
     warm_start_level: float = 1.0,
 ) -> None:
     """Test a GPC policy with an interactive simulation.
@@ -25,6 +26,8 @@ def test_interactive(
         policy: The GPC policy to test.
         mj_data: The initial state for the simulation.
         inference_timestep: The timestep dt to use for flow matching inference.
+        sim_timestep: The timestep to use for the simulation (None uses the
+        model default).
         warm_start_level: The warm start level to use for the policy.
     """
     rng = jax.random.key(0)
@@ -39,6 +42,8 @@ def test_interactive(
 
     # Set up the mujoco simultion
     mj_model = task.mj_model
+    if sim_timestep is not None:
+        mj_model.opt.timestep = sim_timestep
     if mj_data is None:
         mj_data = mujoco.MjData(mj_model)
 
