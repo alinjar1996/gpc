@@ -93,11 +93,7 @@ def test_fit() -> None:
     # Fit the policy network
     st = time.time()
     rng, fit_rng = jax.random.split(rng)
-    u_min = -2.0
-    u_max = 2.0
-    loss = fit_policy(
-        y, U, net, optimizer, batch_size, num_epochs, u_min, u_max, fit_rng
-    )
+    loss = fit_policy(y, U, net, optimizer, batch_size, num_epochs, fit_rng)
     print("Final loss:", loss)
     assert loss < 1.0
     print("Fit time:", time.time() - st)
