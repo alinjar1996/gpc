@@ -14,6 +14,7 @@ from gpc.policy import Policy
 def test_interactive(
     env: TrainingEnv,
     policy: Policy,
+    mj_data: mujoco.MjData = None,
     inference_timestep: float = 0.1,
     warm_start_level: float = 1.0,
 ) -> None:
@@ -22,6 +23,7 @@ def test_interactive(
     Args:
         env: The environment, which defines the system to simulate.
         policy: The GPC policy to test.
+        mj_data: The initial state for the simulation.
         inference_timestep: The timestep dt to use for flow matching inference.
         warm_start_level: The warm start level to use for the policy.
     """
@@ -37,7 +39,8 @@ def test_interactive(
 
     # Set up the mujoco simultion
     mj_model = task.mj_model
-    mj_data = mujoco.MjData(mj_model)
+    if mj_data is None:
+        mj_data = mujoco.MjData(mj_model)
 
     # Initialize the action sequence
     actions = jnp.zeros((task.planning_horizon, task.model.nu))

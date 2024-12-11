@@ -312,7 +312,7 @@ def train(  # noqa: PLR0915 this is a long function, don't limit to 50 lines
         )(env, ctrl, policy, exploration_noise_level, rngs)
 
         # Get the first few simulated trajectories
-        selected_states = jax.tree_map(lambda x: x[:num_videos], states)
+        selected_states = jax.tree.map(lambda x: x[:num_videos], states)
 
         frac = jnp.mean(J_policy < J_spc)
         return y, U, jnp.mean(J_spc), jnp.mean(J_policy), frac, selected_states
