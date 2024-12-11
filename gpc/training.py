@@ -352,6 +352,11 @@ def train(  # noqa: PLR0915 this is a long function, don't limit to 50 lines
         y = observations.reshape(-1, observations.shape[-1])
         U = actions.reshape(-1, env.task.planning_horizon, env.task.model.nu)
 
+        # Rescale the actions from [u_min, u_max] to [-1, 1]
+        mean = (env.task.u_max + env.task.u_min) / 2
+        scale = (env.task.u_max - env.task.u_min) / 2
+        U = (U - mean) / scale
+
         # Normalize the observations, updating the running statistics stored
         # in the policy
         y = policy.normalizer(y, use_running_average=not normalize_observations)

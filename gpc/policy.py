@@ -88,7 +88,7 @@ class Policy:
             """Flow the sample U along the learned vector field."""
             U, t = args
             U += self.dt * self.model(U, y, t)
-            U = jax.numpy.clip(U, self.u_min, self.u_max)
+            U = jax.numpy.clip(U, -1, 1)
             return U, t + self.dt
 
         # While t < 1, U += dt * model(U, y, t)
@@ -97,4 +97,10 @@ class Policy:
             _step,
             (U, jnp.zeros(1)),
         )
+
+        # Rescale actions from [-1, 1] to [u_min, u_max]
+        mean = (self.u_max + self.u_min) / 2
+        scale = (self.u_max - self.u_min) / 2
+        U = U * scale + mean
+
         return U
