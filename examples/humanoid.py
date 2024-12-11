@@ -36,7 +36,7 @@ if __name__ == "__main__":
             num_policy_samples=16,
             log_dir="/tmp/gpc_humanoid",
             num_iters=10,
-            num_envs=256,
+            num_envs=128,
             num_epochs=10,
             checkpoint_every=1,
         )
