@@ -16,12 +16,12 @@ if __name__ == "__main__":
         print(usage)
         sys.exit(1)
 
-    env = HumanoidEnv(episode_length=200)
+    env = HumanoidEnv(episode_length=100)
     save_file = "/tmp/humanoid_policy.pkl"
 
     if sys.argv[1] == "train":
         # Train the policy and save it to a file
-        ctrl = PredictiveSampling(env.task, num_samples=16, noise_level=1.0)
+        ctrl = PredictiveSampling(env.task, num_samples=128, noise_level=1.0)
         net = DenoisingCNN(
             action_size=env.task.model.nu,
             observation_size=env.observation_size,
@@ -35,8 +35,8 @@ if __name__ == "__main__":
             net,
             num_policy_samples=16,
             log_dir="/tmp/gpc_humanoid",
-            num_iters=10,
-            num_envs=128,
+            num_iters=20,
+            num_envs=512,
             num_epochs=10,
             checkpoint_every=1,
         )
