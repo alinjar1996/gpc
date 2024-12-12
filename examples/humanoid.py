@@ -16,7 +16,7 @@ if __name__ == "__main__":
         print(usage)
         sys.exit(1)
 
-    env = HumanoidEnv(episode_length=100)
+    env = HumanoidEnv(episode_length=200)
     save_file = "/tmp/humanoid_policy.pkl"
 
     if sys.argv[1] == "train":
@@ -26,7 +26,7 @@ if __name__ == "__main__":
             action_size=env.task.model.nu,
             observation_size=env.observation_size,
             horizon=env.task.planning_horizon,
-            feature_dims=[64, 64, 64],
+            feature_dims=(128,) * 4,
             rngs=nnx.Rngs(0),
         )
         policy = train(
@@ -35,9 +35,9 @@ if __name__ == "__main__":
             net,
             num_policy_samples=16,
             log_dir="/tmp/gpc_humanoid",
-            num_iters=20,
-            num_envs=512,
-            num_epochs=10,
+            num_iters=50,
+            num_envs=1024,
+            num_epochs=5,
             checkpoint_every=1,
         )
         policy.save(save_file)
