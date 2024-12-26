@@ -1,4 +1,10 @@
+# DEBUG: use 8 cpu cores
+import os
 import sys
+
+os.environ["CUDA_VISIBLE_DEVICES"] = ""
+os.environ["XLA_FLAGS"] = "--xla_force_host_platform_device_count=8"
+os.environ["JAX_PLATFORMS"] = "cpu"
 
 from flax import nnx
 from hydrax.algs import PredictiveSampling
