@@ -1,10 +1,7 @@
-# DEBUG: use 8 cpu cores
-import os
 import sys
+import os
 
-os.environ["CUDA_VISIBLE_DEVICES"] = ""
-os.environ["XLA_FLAGS"] = "--xla_force_host_platform_device_count=8"
-os.environ["JAX_PLATFORMS"] = "cpu"
+os.environ["CUDA_VISIBLE_DEVICES"] = "0,1,2,3"
 
 from flax import nnx
 from hydrax.algs import PredictiveSampling
@@ -42,9 +39,10 @@ if __name__ == "__main__":
             num_policy_samples=8,
             log_dir="/tmp/gpc_particle",
             num_iters=10,
-            num_envs=128,
+            num_envs=4096,
             batch_size=128,
             num_epochs=100,
+            num_videos=0,
         )
         policy.save(save_file)
         print(f"Saved policy to {save_file}")

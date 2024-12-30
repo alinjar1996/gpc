@@ -245,6 +245,10 @@ def train(  # noqa: PLR0915 this is a long function, don't limit to 50 lines
     assert jnp.all(jnp.isfinite(env.task.u_min))
     assert jnp.all(jnp.isfinite(env.task.u_max))
 
+    # Set up sharding for parallel simulation across multiple devices
+    mesh = jax.make_mesh((jax.device_count(),), ("env"))
+    sharding = jax.sharding.NamedSharding(mesh, PartitionSpec("env"))
+
     # Print some information about the training setup
     episode_seconds = env.episode_length * env.task.model.opt.timestep
     horizon_seconds = env.task.planning_horizon * env.task.dt
@@ -265,6 +269,10 @@ def train(  # noqa: PLR0915 this is a long function, don't limit to 50 lines
         f" {num_samples * ctrl.num_randomizations * num_envs}"
         f" (= {num_samples} x {ctrl.num_randomizations} x {num_envs})"
     )
+    print("")
+
+    # Print some sharding infos
+    print(sharding)
     print("")
 
     # Print some info about the policy architecture
@@ -372,10 +380,6 @@ def train(  # noqa: PLR0915 this is a long function, don't limit to 50 lines
             rng,
         )
 
-    # Set up sharding for parallel simulation across multiple devices
-    mesh = jax.make_mesh((jax.device_count(),), ("env"))
-    sharding = jax.sharding.NamedSharding(mesh, PartitionSpec("env"))
-
     train_start = datetime.now()
     for i in range(num_iters):
         sim_start = time.time()
@@ -392,9 +396,6 @@ def train(  # noqa: PLR0915 this is a long function, don't limit to 50 lines
         y, U, J_spc, J_policy, frac, traj = jit_simulate(policy, episode_rngs)
         y.block_until_ready()
         sim_time = time.time() - sim_start
-
-        test_arr = y[:, :, 0].T
-        jax.debug.visualize_array_sharding(test_arr)
 
         # Render the first few trajectories for visualization
         # N.B. this uses CPU mujoco's rendering utils, so we need to do it
