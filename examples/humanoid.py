@@ -24,7 +24,7 @@ if __name__ == "__main__":
 
     if sys.argv[1] == "train":
         # Train the policy and save it to a file
-        ctrl = PredictiveSampling(env.task, num_samples=128, noise_level=1.0)
+        ctrl = PredictiveSampling(env.task, num_samples=128, noise_level=1.0, num_randomizations=4)
         net = DenoisingCNN(
             action_size=env.task.model.nu,
             observation_size=env.observation_size,
@@ -36,12 +36,12 @@ if __name__ == "__main__":
             env,
             ctrl,
             net,
-            num_policy_samples=32,
+            num_policy_samples=16,
             log_dir="/tmp/gpc_humanoid",
             num_iters=500,
-            num_envs=128,
-            num_epochs=5,
-            checkpoint_every=2,
+            num_envs=1024,
+            num_epochs=10,
+            checkpoint_every=1,
         )
         policy.save(save_file)
         print(f"Saved policy to {save_file}")
