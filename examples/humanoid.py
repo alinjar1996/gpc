@@ -1,5 +1,5 @@
-import sys
 import os
+import sys
 
 os.environ["CUDA_VISIBLE_DEVICES"] = "0,1,2,3"
 
@@ -24,7 +24,9 @@ if __name__ == "__main__":
 
     if sys.argv[1] == "train":
         # Train the policy and save it to a file
-        ctrl = PredictiveSampling(env.task, num_samples=128, noise_level=1.0, num_randomizations=4)
+        ctrl = PredictiveSampling(
+            env.task, num_samples=128, noise_level=1.0, num_randomizations=8
+        )
         net = DenoisingCNN(
             action_size=env.task.model.nu,
             observation_size=env.observation_size,
@@ -36,10 +38,10 @@ if __name__ == "__main__":
             env,
             ctrl,
             net,
-            num_policy_samples=16,
+            num_policy_samples=64,
             log_dir="/tmp/gpc_humanoid",
-            num_iters=500,
-            num_envs=1024,
+            num_iters=50,
+            num_envs=2048,
             num_epochs=10,
             checkpoint_every=1,
         )
