@@ -1,10 +1,12 @@
-import os
 import sys
 
-os.environ["CUDA_VISIBLE_DEVICES"] = "0,1,2,3"
-
+# os.environ["CUDA_VISIBLE_DEVICES"] = "0,1,2,3"
+# os.environ['XLA_FLAGS'] = (
+#     '--xla_gpu_triton_gemm_any=true '
+#     '--xla_gpu_enable_latency_hiding_scheduler=true '
+# )
 from flax import nnx
-from hydrax.algs import PredictiveSampling
+from hydrax.algs import MPPI
 
 from gpc.architectures import DenoisingCNN
 from gpc.envs import HumanoidEnv
@@ -20,12 +22,16 @@ if __name__ == "__main__":
         sys.exit(1)
 
     env = HumanoidEnv(episode_length=200)
-    save_file = "/tmp/humanoid_policy.pkl"
+    save_file = "/home/vincek/gpc_logs/humanoid_policy.pkl"
 
     if sys.argv[1] == "train":
         # Train the policy and save it to a file
-        ctrl = PredictiveSampling(
-            env.task, num_samples=128, noise_level=1.0, num_randomizations=8
+        ctrl = MPPI(
+            env.task,
+            num_samples=128,
+            noise_level=1.0,
+            num_randomizations=1,
+            temperature=0.1,
         )
         net = DenoisingCNN(
             action_size=env.task.model.nu,
@@ -38,10 +44,10 @@ if __name__ == "__main__":
             env,
             ctrl,
             net,
-            num_policy_samples=64,
-            log_dir="/tmp/gpc_humanoid",
-            num_iters=50,
-            num_envs=2048,
+            num_policy_samples=1,
+            log_dir="/home/vincek/gpc_logs/humanoid",
+            num_iters=8,
+            num_envs=256,
             num_epochs=10,
             checkpoint_every=1,
         )
