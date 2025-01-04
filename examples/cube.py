@@ -17,7 +17,7 @@ if __name__ == "__main__":
         print(usage)
         sys.exit(1)
 
-    env = CubeEnv(episode_length=300)
+    env = CubeEnv(episode_length=1_000)
     save_file = "/tmp/cube_policy.pkl"
 
     if sys.argv[1] == "train":
@@ -27,7 +27,7 @@ if __name__ == "__main__":
             action_size=env.task.model.nu,
             observation_size=env.observation_size,
             horizon=env.task.planning_horizon,
-            feature_dims=[32, 32, 32],
+            feature_dims=[64, 64, 64],
             rngs=nnx.Rngs(0),
         )
         policy = train(
@@ -36,10 +36,10 @@ if __name__ == "__main__":
             net,
             num_policy_samples=32,
             log_dir="/tmp/gpc_cube",
-            num_iters=20,
-            num_envs=4,
-            num_epochs=1,
-            checkpoint_every=5,
+            num_iters=50,
+            num_envs=64,
+            num_epochs=20,
+            checkpoint_every=1,
             num_videos=4,
         )
         policy.save(save_file)

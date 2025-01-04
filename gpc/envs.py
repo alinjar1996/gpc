@@ -361,14 +361,15 @@ class CubeEnv(TrainingEnv):
 
     def reset(self, data: mjx.Data, rng: jax.Array) -> mjx.Data:
         """Reset the simulator to start a new episode."""
-        rng, cube_rng, target_rng = jax.random.split(rng, 3)
+        rng, joint_rng, cube_rng, target_rng = jax.random.split(rng, 4)
 
         # Resize configurations and velocities
         qpos = self.q_home + jax.random.uniform(
-            rng, self.task.model.nq, minval=0.0, maxval=0.0
+            joint_rng, self.task.model.nq, minval=-0.5, maxval=0.5
         )
-        qvel = jnp.zeros(self.task.model.nv) + jax.random.uniform(
-            rng, self.task.model.nv, minval=0.0, maxval=0.0
+        qvel = (
+            jnp.zeros(self.task.model.nv)
+            + jax.random.uniform(rng, self.task.model.nv) * 0.0
         )
 
         # Random quaternion for the cube
