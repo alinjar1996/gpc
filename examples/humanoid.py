@@ -1,6 +1,7 @@
 import sys
+import os
 
-# os.environ["CUDA_VISIBLE_DEVICES"] = "0,1,2,3"
+os.environ["CUDA_VISIBLE_DEVICES"] = "0,1,2,3"
 # os.environ['XLA_FLAGS'] = (
 #     '--xla_gpu_triton_gemm_any=true '
 #     '--xla_gpu_enable_latency_hiding_scheduler=true '
@@ -46,9 +47,9 @@ if __name__ == "__main__":
             net,
             num_policy_samples=1,
             log_dir="/home/vincek/gpc_logs/humanoid",
-            num_iters=8,
-            num_envs=256,
-            num_epochs=10,
+            num_iters=100,
+            num_envs=512,
+            num_epochs=100,
             checkpoint_every=1,
         )
         policy.save(save_file)

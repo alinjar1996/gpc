@@ -345,22 +345,20 @@ class HumanoidEnv(TrainingEnv):
         rng, pos_rng, vel_rng, ori_rng = jax.random.split(rng, 4)
 
         # Random positions and velocities
-        qpos = self.task.qstand + 0.01 * jax.random.normal(
+        qpos = self.task.qstand + 0.1 * jax.random.normal(
             pos_rng, (self.task.model.nq,)
         )
         qvel = 0.1 * jax.random.normal(vel_rng, (self.task.model.nv,))
 
         # Random base orientation
-        # u, v, w = jax.random.uniform(ori_rng, (3,))
-        # quat = jnp.array(
-        # [
-        # jnp.sqrt(1 - u) * jnp.sin(2 * jnp.pi * v),
-        # jnp.sqrt(1 - u) * jnp.cos(2 * jnp.pi * v),
-        # jnp.sqrt(u) * jnp.sin(2 * jnp.pi * w),
-        # jnp.sqrt(u) * jnp.cos(2 * jnp.pi * w),
-        # ]
-        # )
-        # qpos = qpos.at[3:7].set(quat)
+        u, v, w = jax.random.uniform(ori_rng, (3,))
+        quat = jnp.array([
+            jnp.sqrt(1 - u) * jnp.sin(2 * jnp.pi * v),
+            jnp.sqrt(1 - u) * jnp.cos(2 * jnp.pi * v),
+            jnp.sqrt(u) * jnp.sin(2 * jnp.pi * w),
+            jnp.sqrt(u) * jnp.cos(2 * jnp.pi * w),
+        ])
+        qpos = qpos.at[3:7].set(quat)
 
         return data.replace(qpos=qpos, qvel=qvel)
 
