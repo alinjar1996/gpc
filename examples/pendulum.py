@@ -21,7 +21,7 @@ if __name__ == "__main__":
 
     if sys.argv[1] == "train":
         # Train the policy and save it to a file
-        ctrl = PredictiveSampling(env.task, num_samples=64, noise_level=0.1)
+        ctrl = PredictiveSampling(env.task, num_samples=8, noise_level=0.1)
         net = DenoisingMLP(
             action_size=env.task.model.nu,
             observation_size=env.observation_size,
@@ -33,12 +33,13 @@ if __name__ == "__main__":
             env,
             ctrl,
             net,
-            num_policy_samples=16,
+            num_policy_samples=2,
             log_dir="/tmp/gpc_pendulum",
             num_epochs=10,
-            num_iters=30,
+            num_iters=10,
             num_envs=128,
             num_videos=2,
+            strategy="best",
         )
         policy.save(save_file)
         print(f"Saved policy to {save_file}")
