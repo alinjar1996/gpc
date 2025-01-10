@@ -13,7 +13,7 @@ from gpc.testing import test_interactive
 from gpc.training import train
 
 if __name__ == "__main__":
-    usage = f"Usage: python {sys.argv[0]} [train|test]"
+    usage = f"Usage: python {sys.argv[0]} [train|test|sample]"
 
     if len(sys.argv) != 2:
         print(usage)
