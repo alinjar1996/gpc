@@ -1,11 +1,14 @@
 import sys
 
+import mujoco
 from flax import nnx
 from hydrax.algs import PredictiveSampling
+from hydrax.simulation.deterministic import run_interactive as run_sampling
 
 from gpc.architectures import DenoisingCNN
 from gpc.envs import WalkerEnv
 from gpc.policy import Policy
+from gpc.sampling import BootstrappedPredictiveSampling
 from gpc.testing import test_interactive
 from gpc.training import train
 
@@ -49,6 +52,22 @@ if __name__ == "__main__":
         test_interactive(
             env, policy, inference_timestep=0.01, warm_start_level=1.0
         )
+
+    elif sys.argv[1] == "sample":
+        # Use the policy to bootstrap sampling-based MPC
+        policy = Policy.load(save_file)
+        ctrl = BootstrappedPredictiveSampling(
+            policy,
+            env.get_obs,
+            num_policy_samples=128,
+            task=env.task,
+            num_samples=0,
+            noise_level=0.3,
+        )
+
+        mj_model = env.task.mj_model
+        mj_data = mujoco.MjData(mj_model)
+        run_sampling(ctrl, mj_model, mj_data, frequency=50, fixed_camera_id=0)
 
     else:
         print(usage)

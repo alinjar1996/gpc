@@ -56,8 +56,6 @@ if __name__ == "__main__":
     elif sys.argv[1] == "sample":
         # Use the policy to bootstrap sampling-based MPC
         policy = Policy.load(save_file)
-
-        # TODO: include policy in policy
         ctrl = BootstrappedPredictiveSampling(
             policy,
             env.get_obs,

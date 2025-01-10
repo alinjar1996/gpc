@@ -29,7 +29,9 @@ class BootstrappedPredictiveSampling(PredictiveSampling):
         """
         self.observation_fn = observation_fn
         self.policy = policy
+        self.policy.model.eval()  # Don't update batch statistics
         self.num_policy_samples = num_policy_samples
+
         super().__init__(**kwargs)
 
     def optimize(self, state: mjx.Data, params: Any) -> Tuple[Any, Trajectory]:
