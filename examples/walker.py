@@ -59,6 +59,8 @@ if __name__ == "__main__":
         ctrl = BootstrappedPredictiveSampling(
             policy,
             env.get_obs,
+            warm_start_level=0.5,
+            inference_timestep=0.1,
             num_policy_samples=128,
             task=env.task,
             num_samples=0,

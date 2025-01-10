@@ -17,6 +17,8 @@ class BootstrappedPredictiveSampling(PredictiveSampling):
         policy: Policy,
         observation_fn: Callable[[mjx.Data], jax.Array],
         num_policy_samples: int,
+        warm_start_level: float = 0.0,
+        inference_timestep: float = 0.1,
         **kwargs,
     ):
         """Initialize the controller.
@@ -25,11 +27,16 @@ class BootstrappedPredictiveSampling(PredictiveSampling):
             policy: The generative policy to sample from.
             observation_fn: A function that produces an observation vector.
             num_policy_samples: The number of samples to take from the policy.
+            warm_start_level: The warm start level in [0, 1] to use for the
+                policy samples. 0.0 generates samples from scratch, while 1.0
+                seed all samples from the previous action sequence.
+            inference_timestep: The timestep dt for flow matching inference.
             **kwargs: Constructor arguments for PredictiveSampling.
         """
         self.observation_fn = observation_fn
-        self.policy = policy
+        self.policy = policy.replace(dt=inference_timestep)
         self.policy.model.eval()  # Don't update batch statistics
+        self.warm_start_level = jnp.clip(warm_start_level, 0.0, 1.0)
         self.num_policy_samples = num_policy_samples
 
         super().__init__(**kwargs)
@@ -57,10 +64,14 @@ class BootstrappedPredictiveSampling(PredictiveSampling):
         # Sample from the generative policy, which is conditioned on the latest
         # observation.
         y = self.observation_fn(state)
-        prev = jnp.zeros((self.task.planning_horizon, self.task.model.nu))
         policy_rngs = jax.random.split(policy_rng, self.num_policy_samples)
-        policy_controls = jax.vmap(self.policy.apply, in_axes=(None, None, 0))(
-            prev, y, policy_rngs
+        policy_controls = jax.vmap(
+            self.policy.apply, in_axes=(None, None, 0, None)
+        )(
+            params.mean,
+            y,
+            policy_rngs,
+            self.warm_start_level,
         )
 
         # Combine the random and policy samples
