@@ -60,9 +60,10 @@ if __name__ == "__main__":
         # TODO: include policy in policy
         ctrl = BootstrappedPredictiveSampling(
             policy,
-            num_policy_samples=8,
+            env.get_obs,
+            num_policy_samples=4,
             task=env.task,
-            num_samples=8,
+            num_samples=4,
             noise_level=0.1,
         )
 

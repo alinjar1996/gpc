@@ -79,7 +79,7 @@ class TrainingEnv(ABC):
         """Reset the simulator to start a new episode."""
 
     @abstractmethod
-    def get_obs(self, state: mjx.Data) -> jax.Array:
+    def get_obs(self, data: mjx.Data) -> jax.Array:
         """Get the observation from the simulator state."""
 
     @property
