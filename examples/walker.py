@@ -63,7 +63,7 @@ if __name__ == "__main__":
             inference_timestep=0.1,
             num_policy_samples=128,
             task=env.task,
-            num_samples=0,
+            num_samples=1,
             noise_level=0.3,
         )
 
