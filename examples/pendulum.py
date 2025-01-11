@@ -1,4 +1,4 @@
-import sys
+import argparse
 
 import mujoco
 from flax import nnx
@@ -13,16 +13,25 @@ from gpc.testing import test_interactive
 from gpc.training import train
 
 if __name__ == "__main__":
-    usage = f"Usage: python {sys.argv[0]} [train|test|sample]"
+    # Parse command line arguments
+    parser = argparse.ArgumentParser(
+        description="Swing up an inverted pendulum"
+    )
+    subparsers = parser.add_subparsers(
+        dest="task", help="What to do (choose one)"
+    )
+    subparsers.add_parser("train", help="Train (and save) a generative policy")
+    subparsers.add_parser("test", help="Test a generative policy")
+    subparsers.add_parser(
+        "sample", help="Bootstrap sampling-based MPC with a generative policy"
+    )
+    args = parser.parse_args()
 
-    if len(sys.argv) != 2:
-        print(usage)
-        sys.exit(1)
-
+    # Set up the environment and save file
     env = PendulumEnv(episode_length=200)
     save_file = "/tmp/pendulum_policy.pkl"
 
-    if sys.argv[1] == "train":
+    if args.task == "train":
         # Train the policy and save it to a file
         ctrl = PredictiveSampling(env.task, num_samples=8, noise_level=0.1)
         net = DenoisingMLP(
@@ -47,13 +56,13 @@ if __name__ == "__main__":
         policy.save(save_file)
         print(f"Saved policy to {save_file}")
 
-    elif sys.argv[1] == "test":
+    elif args.task == "test":
         # Load the policy from a file and test it interactively
         print(f"Loading policy from {save_file}")
         policy = Policy.load(save_file)
         test_interactive(env, policy)
 
-    elif sys.argv[1] == "sample":
+    elif args.task == "sample":
         # Use the policy to bootstrap sampling-based MPC
         policy = Policy.load(save_file)
         ctrl = BootstrappedPredictiveSampling(
@@ -70,5 +79,4 @@ if __name__ == "__main__":
         run_sampling(ctrl, mj_model, mj_data, frequency=50)
 
     else:
-        print(usage)
-        sys.exit(1)
+        parser.print_help()
