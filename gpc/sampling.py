@@ -61,9 +61,12 @@ class BootstrappedPredictiveSampling(PredictiveSampling):
         controls, params = self.sample_controls(params)
         controls = jnp.clip(controls, self.task.u_min, self.task.u_max)
 
+        # Update sensor readings and get an observation
+        state = mjx.forward(self.task.model, state)
+        y = self.observation_fn(state)
+
         # Sample from the generative policy, which is conditioned on the latest
         # observation.
-        y = self.observation_fn(state)
         policy_rngs = jax.random.split(policy_rng, self.num_policy_samples)
         policy_controls = jax.vmap(
             self.policy.apply, in_axes=(None, None, 0, None)
