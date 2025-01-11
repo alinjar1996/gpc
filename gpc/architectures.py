@@ -177,7 +177,10 @@ class ConditionalResidualBlock(nnx.Module):
 
 
 class DenoisingCNN(nnx.Module):
-    """A simple Unet architecture for action sequence denoising."""
+    """A denoising convolutional network with FiLM conditioning.
+
+    Based on Diffusion Policy, https://arxiv.org/abs/2303.04137v5.
+    """
 
     def __init__(
         self,

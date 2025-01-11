@@ -24,6 +24,7 @@ def simulate_episode(
     policy: Policy,
     exploration_noise_level: float,
     rng: jax.Array,
+    strategy: str = "policy",
 ) -> Tuple[jax.Array, jax.Array, jax.Array, jax.Array, SimulatorState]:
     """Starting from a random initial state, run SPC and record training data.
 
@@ -34,6 +35,8 @@ def simulate_episode(
         exploration_noise_level: Standard deviation of the gaussian noise added
                                  to each action.
         rng: The random number generator key.
+        strategy: The strategy for advancing the simulation. "policy" uses the
+                  first policy sample, while "best" agregates all samples.
 
     Returns:
         y: The observations at each time step.
@@ -89,7 +92,12 @@ def simulate_episode(
         policy_best = costs[policy_best_idx]
 
         # Step the simulation
-        u = Us[0, 0]
+        if strategy == "policy":
+            u = Us[0, 0]
+        elif strategy == "best":
+            u = U_star[0]
+        else:
+            raise ValueError(f"Unknown strategy: {strategy}")
         exploration_noise = exploration_noise_level * jax.random.normal(
             explore_rng, u.shape
         )
@@ -216,6 +224,7 @@ def train(  # noqa: PLR0915 this is a long function, don't limit to 50 lines
     normalize_observations: bool = True,
     num_videos: int = 2,
     video_fps: int = 10,
+    strategy: str = "policy",
 ) -> None:
     """Train a generative predictive controller.
 
@@ -236,6 +245,9 @@ def train(  # noqa: PLR0915 this is a long function, don't limit to 50 lines
         normalize_observations: Flag for observation normalization.
         num_videos: Number of videos to render for visualization.
         video_fps: Frames per second for rendered videos.
+        strategy: The strategy for choosing a control action to advance the
+                  simulation during the data collection phase. "policy" uses the
+                  first policy sample, while "best" agregates all samples.
 
     """
     rng = jax.random.key(0)
@@ -319,8 +331,8 @@ def train(  # noqa: PLR0915 this is a long function, don't limit to 50 lines
         rngs = jax.random.split(rng, num_envs)
 
         y, U, J_spc, J_policy, states = jax.vmap(
-            simulate_episode, in_axes=(None, None, None, None, 0)
-        )(env, ctrl, policy, exploration_noise_level, rngs)
+            simulate_episode, in_axes=(None, None, None, None, 0, None)
+        )(env, ctrl, policy, exploration_noise_level, rngs, strategy)
 
         # Get the first few simulated trajectories
         selected_states = jax.tree.map(lambda x: x[:num_videos], states)
