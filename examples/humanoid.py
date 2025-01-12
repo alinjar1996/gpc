@@ -28,7 +28,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     # Set up the environment and save file
-    env = HumanoidEnv(episode_length=200)
+    env = HumanoidEnv(episode_length=400)
     save_file = "/tmp/humanoid_policy.pkl"
 
     if args.task == "train":
@@ -45,14 +45,13 @@ if __name__ == "__main__":
             env,
             ctrl,
             net,
-            num_policy_samples=64,
+            num_policy_samples=32,
             log_dir="/tmp/gpc_humanoid",
-            num_epochs=50,
-            num_iters=10,
-            num_envs=128,
+            num_epochs=10,
+            num_iters=100,
+            num_envs=256,
             num_videos=2,
-            save_every=1,
-            strategy="best",
+            checkpoint_every=1,
         )
         policy.save(save_file)
         print(f"Saved policy to {save_file}")
