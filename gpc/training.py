@@ -103,23 +103,27 @@ def simulate_episode(
         )
         x = env.step(x, u + exploration_noise)
 
-        return (x, Us, psi), (y, U_star, spc_best, policy_best, x)
+        # DEBUG
+        U_guess = psi.base_params.mean
+
+        return (x, Us, psi), (y, U_star, U_guess, spc_best, policy_best, x)
 
     rng, u_rng = jax.random.split(rng)
     U = jax.random.normal(
         u_rng,
         (ctrl.num_policy_samples, env.task.planning_horizon, env.task.model.nu),
     )
-    _, (y, U, J_spc, J_policy, states) = jax.lax.scan(
+    _, (y, U, U_guess, J_spc, J_policy, states) = jax.lax.scan(
         _scan_fn, (x, U, psi), jnp.arange(env.episode_length)
     )
 
-    return y, U, J_spc, J_policy, states
+    return y, U, U_guess, J_spc, J_policy, states
 
 
 def fit_policy(
     observations: jax.Array,
     action_sequences: jax.Array,
+    old_action_sequences: jax.Array,
     model: nnx.Module,
     optimizer: nnx.Optimizer,
     batch_size: int,
@@ -155,6 +159,7 @@ def fit_policy(
         model: nnx.Module,
         obs: jax.Array,
         act: jax.Array,
+        old_act: jax.Array,
         noise: jax.Array,
         t: jax.Array,
     ) -> jax.Array:
@@ -163,7 +168,17 @@ def fit_policy(
         noised_action = t[..., None] * act + (1 - alpha * t[..., None]) * noise
         target = act - alpha * noise
         pred = model(noised_action, obs, t)
-        return jnp.mean(jnp.square(pred - target))
+
+        # DEBUG
+        # Weigh the loss by how close the noise is to the old action sequence.
+        # If old_act and noised_action are on the opposite side of act, then
+        # the weight on this data point should be lower.
+        v1 = (old_act - act).flatten()
+        v2 = (noise - act).flatten()
+        cosine_similarity = jnp.dot(v1, v2) / (jnp.linalg.norm(v1) * jnp.linalg.norm(v2) + 1e-8)
+        weight = jax.lax.stop_gradient(jnp.exp(2 * (cosine_similarity - 1)))
+
+        return weight * jnp.mean(jnp.square(pred - target))
 
     def _train_step(
         model: nnx.Module,
@@ -178,6 +193,7 @@ def fit_policy(
         )
         batch_obs = observations[batch_idx]
         batch_act = action_sequences[batch_idx]
+        batch_old_act = old_action_sequences[batch_idx]
 
         # Sample noise and time steps for the flow matching targets
         rng, noise_rng, t_rng = jax.random.split(rng, 3)
@@ -186,7 +202,7 @@ def fit_policy(
 
         # Compute the loss and its gradient
         loss, grad = nnx.value_and_grad(_loss_fn)(
-            model, batch_obs, batch_act, noise, t
+            model, batch_obs, batch_act, batch_old_act, noise, t
         )
 
         # Update the optimizer and model parameters in-place via flax.nnx
@@ -330,7 +346,7 @@ def train(  # noqa: PLR0915 this is a long function, don't limit to 50 lines
         """
         rngs = jax.random.split(rng, num_envs)
 
-        y, U, J_spc, J_policy, states = jax.vmap(
+        y, U, U_guess, J_spc, J_policy, states = jax.vmap(
             simulate_episode, in_axes=(None, None, None, None, 0, None)
         )(env, ctrl, policy, exploration_noise_level, rngs, strategy)
 
@@ -338,7 +354,7 @@ def train(  # noqa: PLR0915 this is a long function, don't limit to 50 lines
         selected_states = jax.tree.map(lambda x: x[:num_videos], states)
 
         frac = jnp.mean(J_policy < J_spc)
-        return y, U, jnp.mean(J_spc), jnp.mean(J_policy), frac, selected_states
+        return y, U, U_guess, jnp.mean(J_spc), jnp.mean(J_policy), frac, selected_states
 
     @nnx.jit
     def jit_fit(
@@ -346,6 +362,7 @@ def train(  # noqa: PLR0915 this is a long function, don't limit to 50 lines
         optimizer: nnx.Optimizer,
         observations: jax.Array,
         actions: jax.Array,
+        previous_actions: jax.Array,
         rng: jax.Array,
     ) -> jax.Array:
         """Fit the policy network to the data.
@@ -363,11 +380,13 @@ def train(  # noqa: PLR0915 this is a long function, don't limit to 50 lines
         # Flatten across timesteps and initial conditions
         y = observations.reshape(-1, observations.shape[-1])
         U = actions.reshape(-1, env.task.planning_horizon, env.task.model.nu)
+        U_guess = previous_actions.reshape(-1, env.task.planning_horizon, env.task.model.nu)
 
         # Rescale the actions from [u_min, u_max] to [-1, 1]
         mean = (env.task.u_max + env.task.u_min) / 2
         scale = (env.task.u_max - env.task.u_min) / 2
         U = (U - mean) / scale
+        U_guess = (U_guess - mean) / scale
 
         # Normalize the observations, updating the running statistics stored
         # in the policy
@@ -377,6 +396,7 @@ def train(  # noqa: PLR0915 this is a long function, don't limit to 50 lines
         return fit_policy(
             y,
             U,
+            U_guess,
             policy.model,
             optimizer,
             batch_size,
@@ -391,7 +411,7 @@ def train(  # noqa: PLR0915 this is a long function, don't limit to 50 lines
         policy.model.eval()
         sim_start = time.time()
         rng, episode_rng = jax.random.split(rng)
-        y, U, J_spc, J_policy, frac, traj = jit_simulate(policy, episode_rng)
+        y, U, U_guess, J_spc, J_policy, frac, traj = jit_simulate(policy, episode_rng)
         y.block_until_ready()
         sim_time = time.time() - sim_start
 
@@ -411,7 +431,7 @@ def train(  # noqa: PLR0915 this is a long function, don't limit to 50 lines
         policy.model.train()
         fit_start = time.time()
         rng, fit_rng = jax.random.split(rng)
-        loss = jit_fit(policy, optimizer, y, U, fit_rng)
+        loss = jit_fit(policy, optimizer, y, U, U_guess, fit_rng)
         loss.block_until_ready()
         fit_time = time.time() - fit_start
 
