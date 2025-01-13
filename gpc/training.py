@@ -41,6 +41,7 @@ def simulate_episode(
     Returns:
         y: The observations at each time step.
         U: The optimal actions at each time step.
+        U_guess: The initial guess for the optimal actions at each time step.
         J_spc: cost of the best action sequence found by SPC at each time step.
         J_policy: cost of the best action sequence found by the policy.
         states: Vmapped simulator states at each time step.
@@ -103,7 +104,8 @@ def simulate_episode(
         )
         x = env.step(x, u + exploration_noise)
 
-        # DEBUG
+        # Record the initial guess for the optimal action sequence. This is used
+        # to weigh the flow matching loss in the policy training.
         U_guess = psi.base_params.mean
 
         return (x, Us, psi), (y, U_star, U_guess, spc_best, policy_best, x)
@@ -139,6 +141,7 @@ def fit_policy(
     Args:
         observations: The (normalized) observations y.
         action_sequences: The corresponding target action sequences U.
+        old_action_sequences: The previous action sequences U_guess.
         model: The policy network, outputs the flow matching vector field.
         optimizer: The optimizer (e.g. Adam).
         batch_size: The batch size.
@@ -169,13 +172,16 @@ def fit_policy(
         target = act - alpha * noise
         pred = model(noised_action, obs, t)
 
-        # DEBUG
         # Weigh the loss by how close the noise is to the old action sequence.
-        # If old_act and noised_action are on the opposite side of act, then
-        # the weight on this data point should be lower.
+        # If they are similar (in terms of angle to the target action) then the
+        # weight is high. Otherwise the noised sample might be approaching the
+        # target action sequence from a different direction, so this sample
+        # isn't so informative and we reduce the weight.
         v1 = (old_act - act).flatten()
         v2 = (noise - act).flatten()
-        cosine_similarity = jnp.dot(v1, v2) / (jnp.linalg.norm(v1) * jnp.linalg.norm(v2) + 1e-8)
+        cosine_similarity = jnp.dot(v1, v2) / (
+            jnp.linalg.norm(v1) * jnp.linalg.norm(v2) + 1e-8
+        )
         weight = jax.lax.stop_gradient(jnp.exp(2 * (cosine_similarity - 1)))
 
         return weight * jnp.mean(jnp.square(pred - target))
@@ -354,7 +360,15 @@ def train(  # noqa: PLR0915 this is a long function, don't limit to 50 lines
         selected_states = jax.tree.map(lambda x: x[:num_videos], states)
 
         frac = jnp.mean(J_policy < J_spc)
-        return y, U, U_guess, jnp.mean(J_spc), jnp.mean(J_policy), frac, selected_states
+        return (
+            y,
+            U,
+            U_guess,
+            jnp.mean(J_spc),
+            jnp.mean(J_policy),
+            frac,
+            selected_states,
+        )
 
     @nnx.jit
     def jit_fit(
@@ -372,6 +386,7 @@ def train(  # noqa: PLR0915 this is a long function, don't limit to 50 lines
             optimizer: The optimizer (updated in place).
             observations: The observations.
             actions: The best action sequences.
+            previous_actions: The initial/guessed action sequences.
             rng: The random number generator key.
 
         Returns:
@@ -380,7 +395,9 @@ def train(  # noqa: PLR0915 this is a long function, don't limit to 50 lines
         # Flatten across timesteps and initial conditions
         y = observations.reshape(-1, observations.shape[-1])
         U = actions.reshape(-1, env.task.planning_horizon, env.task.model.nu)
-        U_guess = previous_actions.reshape(-1, env.task.planning_horizon, env.task.model.nu)
+        U_guess = previous_actions.reshape(
+            -1, env.task.planning_horizon, env.task.model.nu
+        )
 
         # Rescale the actions from [u_min, u_max] to [-1, 1]
         mean = (env.task.u_max + env.task.u_min) / 2
@@ -411,7 +428,9 @@ def train(  # noqa: PLR0915 this is a long function, don't limit to 50 lines
         policy.model.eval()
         sim_start = time.time()
         rng, episode_rng = jax.random.split(rng)
-        y, U, U_guess, J_spc, J_policy, frac, traj = jit_simulate(policy, episode_rng)
+        y, U, U_guess, J_spc, J_policy, frac, traj = jit_simulate(
+            policy, episode_rng
+        )
         y.block_until_ready()
         sim_time = time.time() - sim_start
 
