@@ -2,11 +2,11 @@ import argparse
 
 import mujoco
 from flax import nnx
-from hydrax.algs import MPPI
+from hydrax.algs import PredictiveSampling
 from hydrax.simulation.deterministic import run_interactive as run_sampling
 
 from gpc.architectures import DenoisingCNN
-from gpc.envs import HumanoidEnv
+from gpc.envs import CubeEnv
 from gpc.policy import Policy
 from gpc.sampling import BootstrappedPredictiveSampling
 from gpc.testing import test_interactive
@@ -15,7 +15,7 @@ from gpc.training import train
 if __name__ == "__main__":
     # Parse command line arguments
     parser = argparse.ArgumentParser(
-        description="Humanoid standup from arbitrary initial positions"
+        description="Dexterous in-hand manipulation of a cube"
     )
     subparsers = parser.add_subparsers(
         dest="task", help="What to do (choose one)"
@@ -28,17 +28,15 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     # Set up the environment and save file
-    env = HumanoidEnv(episode_length=400)
-    save_file = "/tmp/humanoid_policy.pkl"
+    env = CubeEnv(episode_length=1000)
+    save_file = "/tmp/cube_policy.pkl"
 
     if args.task == "train":
         # Train the policy and save it to a file
-        ctrl = MPPI(
+        ctrl = PredictiveSampling(
             env.task,
-            num_samples=128,
-            noise_level=1.0,
-            temperature=0.1,
-            num_randomizations=2,
+            num_samples=32,
+            noise_level=0.2,
         )
         net = DenoisingCNN(
             action_size=env.task.model.nu,
@@ -51,13 +49,14 @@ if __name__ == "__main__":
             env,
             ctrl,
             net,
-            num_policy_samples=1,
-            log_dir="/tmp/gpc_humanoid",
+            num_policy_samples=32,
+            log_dir="/tmp/gpc_cube",
             num_epochs=10,
-            num_iters=50,
-            num_envs=256,
-            num_videos=2,
+            num_iters=10,
+            num_envs=4,
+            num_videos=4,
             checkpoint_every=1,
+            strategy="best",
         )
         policy.save(save_file)
         print(f"Saved policy to {save_file}")
@@ -74,9 +73,9 @@ if __name__ == "__main__":
         ctrl = BootstrappedPredictiveSampling(
             policy,
             env.get_obs,
-            num_policy_samples=64,
+            num_policy_samples=32,
             task=env.task,
-            num_samples=64,
+            num_samples=1,
             noise_level=1.0,
         )
 
