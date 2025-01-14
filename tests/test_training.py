@@ -43,12 +43,13 @@ def test_simulate() -> None:
     policy = Policy(net, normalizer, env.task.u_min, env.task.u_max)
 
     rng, episode_rng = jax.random.split(rng)
-    y, U, J_spc, J_policy, states = simulate_episode(
+    y, U, U_guess, J_spc, J_policy, states = simulate_episode(
         env, ctrl, policy, 0.0, episode_rng
     )
 
     assert y.shape == (13, 4)
     assert U.shape == (13, 5, 2)
+    assert U_guess.shape == (13, 5, 2)
     assert J_spc.shape == (13,)
     assert J_policy.shape == (13,)
     assert isinstance(states, SimulatorState)
@@ -93,7 +94,7 @@ def test_fit() -> None:
     # Fit the policy network
     st = time.time()
     rng, fit_rng = jax.random.split(rng)
-    loss = fit_policy(y, U, net, optimizer, batch_size, num_epochs, fit_rng)
+    loss = fit_policy(y, U, U, net, optimizer, batch_size, num_epochs, fit_rng)
     print("Final loss:", loss)
     assert loss < 1.0
     print("Fit time:", time.time() - st)

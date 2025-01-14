@@ -2,7 +2,7 @@ import argparse
 
 import mujoco
 from flax import nnx
-from hydrax.algs import PredictiveSampling
+from hydrax.algs import MPPI
 from hydrax.simulation.deterministic import run_interactive as run_sampling
 
 from gpc.architectures import DenoisingCNN
@@ -29,26 +29,32 @@ if __name__ == "__main__":
 
     # Set up the environment and save file
     env = HumanoidEnv(episode_length=400)
-    save_file = "/tmp/humanoid_policy.pkl"
+    save_file = "/home/vincek/gpc_logs/humanoid_policy.pkl"
 
     if args.task == "train":
         # Train the policy and save it to a file
-        ctrl = PredictiveSampling(env.task, num_samples=128, noise_level=1.0)
+        ctrl = MPPI(
+            env.task,
+            num_samples=128,
+            noise_level=1.0,
+            temperature=0.1,
+            num_randomizations=2,
+        )
         net = DenoisingCNN(
             action_size=env.task.model.nu,
             observation_size=env.observation_size,
             horizon=env.task.planning_horizon,
-            feature_dims=(64,) * 5,
+            feature_dims=(128,) * 3,
             rngs=nnx.Rngs(0),
         )
         policy = train(
             env,
             ctrl,
             net,
-            num_policy_samples=32,
-            log_dir="/tmp/gpc_humanoid",
+            num_policy_samples=1,
+            log_dir="/home/vincek/gpc_logs/humanoid",
             num_epochs=10,
-            num_iters=100,
+            num_iters=50,
             num_envs=256,
             num_videos=2,
             checkpoint_every=1,
