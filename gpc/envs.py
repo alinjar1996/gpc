@@ -96,6 +96,12 @@ class TrainingEnv(ABC):
         data = mjx.forward(self.task.model, data)  # update sensor data
         return SimulatorState(data=data, t=0, rng=rng)
 
+    def _update_goal(self, state: SimulatorState) -> SimulatorState:
+        """Update the goal state during the middle of an episode."""
+        rng, goal_rng = jax.random.split(state.rng)
+        data = self.update_goal(state.data, goal_rng)
+        return state.replace(data=data, rng=rng)
+
     def _get_observation(self, state: SimulatorState) -> jax.Array:
         """Get the observation from the simulator state."""
         return self.get_obs(state.data)
@@ -107,6 +113,23 @@ class TrainingEnv(ABC):
         """
         return state.t >= self.episode_length
 
+    def goal_reached(self, state: SimulatorState) -> bool:
+        """Check if we've achieved a sub-goal.
+
+        This gives us the opportunity to update the goal before the episode
+        ends. For example, we might want to choose a new target configuration
+        once the old one has been reached.
+        """
+        return False
+
+    def update_goal(self, data: mjx.Data, rng: jax.Array) -> mjx.Data:
+        """Update the goal state during the middle of an episode.
+
+        Typically this is done via mocap_pos and mocap_quat, and by default we
+        do nothing.
+        """
+        return data
+
     def step(self, state: SimulatorState, action: jax.Array) -> SimulatorState:
         """Take a simulation step.
 
@@ -117,7 +140,8 @@ class TrainingEnv(ABC):
         Returns:
             The new simulator state and the new time step.
         """
-        return jax.lax.cond(
+        # Check if the episode is over
+        next_state = jax.lax.cond(
             self.episode_over(state),
             lambda _: self._reset_state(state),
             lambda _: state.replace(
@@ -126,6 +150,16 @@ class TrainingEnv(ABC):
             ),
             operand=None,
         )
+
+        # Check if we've reached a sub-goal that needs updating
+        next_state = jax.lax.cond(
+            self.goal_reached(next_state),
+            lambda _: self._update_goal(next_state),
+            lambda _: next_state,
+            operand=None,
+        )
+
+        return next_state
 
 
 class ParticleEnv(TrainingEnv):
@@ -402,6 +436,19 @@ class CubeEnv(TrainingEnv):
         episode_over = state.t >= self.episode_length
         cube_dropped = state.data.qpos[18] <= -0.2
         return jnp.logical_or(episode_over, cube_dropped)
+
+    def goal_reached(self, state: SimulatorState) -> bool:
+        """Check if the cube is close to the target orientation."""
+        return (
+            jnp.linalg.norm(self.task._get_cube_orientation_err(state.data))
+            <= 0.1
+        )
+
+    def update_goal(self, data: mjx.Data, rng: jax.Array) -> mjx.Data:
+        """Update the target orientation."""
+        target_quat = self._random_quat(rng)
+        mocap_quat = data.mocap_quat.at[0].set(target_quat)
+        return data.replace(mocap_quat=mocap_quat)
 
     def reset(self, data: mjx.Data, rng: jax.Array) -> mjx.Data:
         """Reset the simulator to start a new episode."""
