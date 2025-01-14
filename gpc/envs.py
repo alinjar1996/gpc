@@ -41,6 +41,13 @@ class TrainingEnv(ABC):
         self.episode_length = episode_length
         self.renderer = mujoco.Renderer(self.task.mj_model)
 
+        # Disable shadows and reflections for faster rendering
+        self.renderer.scene.flags[mujoco.mjtRndFlag.mjRND_SHADOW] = False
+        self.renderer.scene.flags[mujoco.mjtRndFlag.mjRND_REFLECTION] = False
+        self.renderer.scene.flags[mujoco.mjtRndFlag.mjRND_FOG] = False
+        self.renderer.scene.flags[mujoco.mjtRndFlag.mjRND_HAZE] = False
+        breakpoint()
+
     def init_state(self, rng: jax.Array) -> SimulatorState:
         """Initialize the simulator state."""
         state = SimulatorState(
