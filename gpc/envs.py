@@ -46,7 +46,6 @@ class TrainingEnv(ABC):
         self.renderer.scene.flags[mujoco.mjtRndFlag.mjRND_REFLECTION] = False
         self.renderer.scene.flags[mujoco.mjtRndFlag.mjRND_FOG] = False
         self.renderer.scene.flags[mujoco.mjtRndFlag.mjRND_HAZE] = False
-        breakpoint()
 
     def init_state(self, rng: jax.Array) -> SimulatorState:
         """Initialize the simulator state."""
