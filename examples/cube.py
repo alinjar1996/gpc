@@ -56,7 +56,7 @@ if __name__ == "__main__":
             num_envs=4,
             num_videos=4,
             checkpoint_every=1,
-            strategy="best",
+            strategy="policy",
         )
         policy.save(save_file)
         print(f"Saved policy to {save_file}")

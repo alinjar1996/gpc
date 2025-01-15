@@ -490,13 +490,22 @@ class CubeEnv(TrainingEnv):
         """Observe the hand state and cube state relative to the target."""
         cube_position_err = self.task._get_cube_position_err(data)
         cube_orientation_err = self.task._get_cube_orientation_err(data)
+        cube_orientation = data.qpos[-4:]
+        cube_velocity = data.qvel[-6:]
         joint_pos = data.qpos[:16]
         joint_vel = data.qvel[:16]
         return jnp.concatenate(
-            [cube_position_err, cube_orientation_err, joint_pos, joint_vel]
+            [
+                cube_position_err,
+                cube_orientation_err,
+                cube_orientation,
+                joint_pos,
+                joint_vel,
+                cube_velocity,
+            ]
         )
 
     @property
     def observation_size(self) -> int:
         """The size of the observation space."""
-        return 38
+        return 48
