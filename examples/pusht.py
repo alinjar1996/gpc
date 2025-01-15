@@ -39,6 +39,7 @@ if __name__ == "__main__":
             observation_size=env.observation_size,
             horizon=env.task.planning_horizon,
             feature_dims=[32, 32, 32],
+            timestep_embedding_dim=8,
             rngs=nnx.Rngs(0),
         )
         policy = train(
@@ -60,7 +61,7 @@ if __name__ == "__main__":
         print(f"Loading policy from {save_file}")
         policy = Policy.load(save_file)
         mj_data = mujoco.MjData(env.task.mj_model)
-        mj_data.qpos[:] = [0.1, 0.1, -2.0, 0.0, 0.0]  # set the initial state
+        mj_data.qpos[:] = [0.1, 0.1, 2.0, 0.0, 0.0]  # set the initial state
         test_interactive(env, policy, mj_data)
 
     elif args.task == "sample":
