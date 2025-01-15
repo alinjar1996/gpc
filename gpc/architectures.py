@@ -92,7 +92,7 @@ class PositionalEmbedding(nnx.Module):
     def __call__(self, t: jax.Array) -> jax.Array:
         """Compute the positional embedding."""
         freqs = jnp.arange(1, self.half_dim + 1) * jnp.pi
-        emb = jnp.outer(t, freqs)
+        emb = freqs * jnp.squeeze(t)[..., None]
         emb = jnp.concatenate([jnp.sin(emb), jnp.cos(emb)], axis=-1)
         return emb
 
@@ -247,7 +247,7 @@ class DenoisingCNN(nnx.Module):
     def __call__(self, u: jax.Array, y: jax.Array, t: jax.Array) -> jax.Array:
         """Forward pass through the network."""
         emb = self.positional_embedding(t)
-        y = jnp.concatenate([y, jnp.squeeze(emb)], axis=-1)
+        y = jnp.concatenate([y, emb], axis=-1)
 
         x = self.l0(u, y)
         for i in range(1, self.num_layers):

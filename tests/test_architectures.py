@@ -88,6 +88,13 @@ def test_positional_embedding() -> None:
     dim = 8
     emb = PositionalEmbedding(dim)
 
+    e = emb(jnp.zeros(1)[0])
+    assert e.shape == (dim,)
+
+    t = jnp.zeros((24, 14, 1))
+    e = emb(t)
+    assert e.shape == (24, 14, dim)
+
     t = jnp.linspace(0, 1, 100)
     e = emb(t)
     assert e.shape == (100, dim)
