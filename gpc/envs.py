@@ -322,12 +322,15 @@ class WalkerEnv(TrainingEnv):
 
     def get_obs(self, data: mjx.Data) -> jax.Array:
         """Observe everything in the state except the horizontal position."""
-        return jnp.concatenate([jnp.delete(data.qpos, 1), data.qvel])
+        pz = data.qpos[0]  # base coordinates are (z, x, theta)
+        theta = data.qpos[2]
+        base_pos_data = jnp.array([jnp.cos(theta), jnp.sin(theta), pz])
+        return jnp.concatenate([base_pos_data, data.qpos[3:], data.qvel])
 
     @property
     def observation_size(self) -> int:
         """The size of the observation space."""
-        return 17
+        return 18
 
 
 class PushTEnv(TrainingEnv):
