@@ -2,9 +2,15 @@ from pathlib import Path
 
 import cloudpickle
 import jax.numpy as jnp
+import matplotlib.pyplot as plt
 from flax import nnx
 
-from gpc.architectures import MLP, DenoisingCNN, DenoisingMLP
+from gpc.architectures import (
+    MLP,
+    DenoisingCNN,
+    DenoisingMLP,
+    PositionalEmbedding,
+)
 
 
 def test_mlp_construction() -> None:
@@ -77,6 +83,24 @@ def test_denoising_mlp() -> None:
     assert U_out.shape == (14, 24, num_steps, action_dim)
 
 
+def test_positional_embedding() -> None:
+    """Test our sinusoidal positional embedding."""
+    dim = 8
+    emb = PositionalEmbedding(dim)
+
+    t = jnp.linspace(0, 1, 100)
+    e = emb(t)
+    assert e.shape == (100, dim)
+
+    if __name__ == "__main__":
+        # Visualize the positional embedding
+        plt.plot(t, e)
+        plt.xlabel("Time")
+        plt.ylabel("Positional Embedding")
+        plt.title("Sinusoidal Positional Embedding")
+        plt.show()
+
+
 def test_denoising_cnn() -> None:
     """Test the denoising CNN."""
     num_steps = 5
@@ -105,4 +129,5 @@ if __name__ == "__main__":
     test_mlp_construction()
     test_mlp_save_load()
     test_denoising_mlp()
+    test_positional_embedding()
     test_denoising_cnn()

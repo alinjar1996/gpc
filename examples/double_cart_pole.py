@@ -38,7 +38,8 @@ if __name__ == "__main__":
             action_size=env.task.model.nu,
             observation_size=env.observation_size,
             horizon=env.task.planning_horizon,
-            feature_dims=[32, 32, 32],
+            feature_dims=[64, 128, 256],
+            timestep_embedding_dim=8,
             rngs=nnx.Rngs(0),
         )
         policy = train(
@@ -60,7 +61,7 @@ if __name__ == "__main__":
         # Load the policy from a file and test it interactively
         print(f"Loading policy from {save_file}")
         policy = Policy.load(save_file)
-        test_interactive(env, policy, inference_timestep=0.01)
+        test_interactive(env, policy, inference_timestep=0.1)
 
     elif args.task == "sample":
         # Use the policy to bootstrap sampling-based MPC

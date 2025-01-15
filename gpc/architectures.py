@@ -78,6 +78,25 @@ class DenoisingMLP(nnx.Module):
         return x.reshape(batches + (self.horizon, self.action_size))
 
 
+class PositionalEmbedding(nnx.Module):
+    """A simple sinusoidal positional embedding layer."""
+
+    def __init__(self, dim: int):
+        """Initialize the positional embedding.
+
+        Args:
+            dim: Dimension to lift the input to.
+        """
+        self.half_dim = dim // 2
+
+    def __call__(self, t: jax.Array) -> jax.Array:
+        """Compute the positional embedding."""
+        freqs = jnp.arange(1, self.half_dim + 1) * jnp.pi
+        emb = jnp.outer(t, freqs)
+        emb = jnp.concatenate([jnp.sin(emb), jnp.cos(emb)], axis=-1)
+        return emb
+
+
 class Conv1DBlock(nnx.Module):
     """A simple temporal convolutional block.
 
@@ -189,6 +208,8 @@ class DenoisingCNN(nnx.Module):
         horizon: int,
         feature_dims: Sequence[int],
         rngs: nnx.Rngs,
+        kernel_size: int = 3,
+        timestep_embedding_dim: int = 32,
     ):
         """Initialize the network.
 
@@ -198,12 +219,14 @@ class DenoisingCNN(nnx.Module):
             horizon: Number of steps in the action sequence (U = [u0, u1, ...]).
             feature_dims: List of feature dimensions.
             rngs: Random number generators for initialization.
+            kernel_size: Size of the convolutional kernel.
+            timestep_embedding_dim: Dimension of the positional embedding.
         """
         self.action_size = action_size
         self.observation_size = observation_size
         self.horizon = horizon
         self.num_layers = len(feature_dims) + 1
-        kernel_size = 3
+        self.positional_embedding = PositionalEmbedding(timestep_embedding_dim)
 
         feature_sizes = [action_size] + list(feature_dims) + [action_size]
         for i, (input_size, output_size) in enumerate(
@@ -215,7 +238,7 @@ class DenoisingCNN(nnx.Module):
                 ConditionalResidualBlock(
                     input_size,
                     output_size,
-                    observation_size + 1,
+                    observation_size + timestep_embedding_dim,
                     kernel_size,
                     rngs,
                 ),
@@ -223,7 +246,8 @@ class DenoisingCNN(nnx.Module):
 
     def __call__(self, u: jax.Array, y: jax.Array, t: jax.Array) -> jax.Array:
         """Forward pass through the network."""
-        y = jnp.concatenate([y, t], axis=-1)
+        emb = self.positional_embedding(t)
+        y = jnp.concatenate([y, jnp.squeeze(emb)], axis=-1)
 
         x = self.l0(u, y)
         for i in range(1, self.num_layers):
