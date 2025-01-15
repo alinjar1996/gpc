@@ -322,7 +322,7 @@ def train(  # noqa: PLR0915 this is a long function, don't limit to 50 lines
     policy = Policy(net, normalizer, env.task.u_min, env.task.u_max)
 
     # Set up the optimizer
-    optimizer = nnx.Optimizer(net, optax.adam(learning_rate))
+    optimizer = nnx.Optimizer(net, optax.adamw(learning_rate))
 
     # Set up the TensorBoard logger
     log_dir = Path(log_dir) / time.strftime("%Y%m%d_%H%M%S")
