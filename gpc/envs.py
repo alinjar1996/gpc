@@ -527,14 +527,17 @@ class CraneEnv(TrainingEnv):
         rng, pos_rng, vel_rng, target_rng = jax.random.split(rng, 4)
 
         # Crane state
-        # TODO: figure out a more principled way to initialize these
+        # TODO: figure out a more principled way to initialize these.
+        # Right now the crane swings wildly at initialization, which prevents
+        # gathering a lot of data near the target (which is where the system is
+        # mostly at run time).
         q_lim = jnp.array(
             [
                 [-1.0, 1.0],  # slew
                 [0.0, 1.0],  # luff
-                [0.0, 2.0],  # hoist (?)
-                [1.0, 2.2],  # payload x-pos
-                [-0.5, 0.5],  # payload y-pos
+                [-1.0, 1.0],  # payload x-pos
+                [1.0, 2.2],  # payload y-pos
+                [0.3, 1.0],  # payload z-pos
                 [1.0, 1.0],  # payload orientation (fixed upright)
                 [0.0, 0.0],
                 [0.0, 0.0],
@@ -552,8 +555,9 @@ class CraneEnv(TrainingEnv):
         )
 
         # Target position
-        pos_min = jnp.array([-1.0, 1.2, 0.0])
-        pos_max = jnp.array([1.0, 2.2, 1.0])
+        # TODO: figure out a better set of potential target positions
+        pos_min = jnp.array([-1.5, 1.0, 0.0])
+        pos_max = jnp.array([1.5, 3.0, 1.5])
         target_pos = jax.random.uniform(
             target_rng, (3,), minval=pos_min, maxval=pos_max
         )
