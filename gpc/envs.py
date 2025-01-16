@@ -531,15 +531,17 @@ class CraneEnv(TrainingEnv):
         # the simulation unstable - or modify the simulation to be more stable
         # from arbitrary initial conditions.
         qpos = self.task.model.qpos0 + jax.random.uniform(
-            pos_rng, (self.task.model.nq,), minval=-0.1, maxval=0.1
+            pos_rng, (self.task.model.nq,), minval=-0.0, maxval=0.0
         )
         qvel = jax.random.uniform(
-            vel_rng, (self.task.model.nv,), minval=-0.1, maxval=0.1
+            vel_rng, (self.task.model.nv,), minval=-0.0, maxval=0.0
         )
 
         # Target position
         pos_min = jnp.array([-1.0, 1.2, 0.0])
         pos_max = jnp.array([1.0, 2.2, 1.0])
+        # pos_min = jnp.array([0.05, 2.0, 0.3])
+        # pos_max = jnp.array([0.05, 2.0, 0.3])
         target_pos = jax.random.uniform(
             target_rng, (3,), minval=pos_min, maxval=pos_max
         )
@@ -565,4 +567,4 @@ class CraneEnv(TrainingEnv):
     @property
     def observation_size(self) -> int:
         """The size of the observation space."""
-        return 26 - 7
+        return 23

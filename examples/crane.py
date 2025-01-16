@@ -28,12 +28,12 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     # Set up the environment and save file
-    env = CraneEnv(episode_length=100)
+    env = CraneEnv(episode_length=300)
     save_file = "/tmp/crane_policy.pkl"
 
     if args.task == "train":
         # Train the policy and save it to a file
-        ctrl = PredictiveSampling(env.task, num_samples=8, noise_level=0.05)
+        ctrl = PredictiveSampling(env.task, num_samples=4, noise_level=0.05)
         net = DenoisingMLP(
             action_size=env.task.model.nu,
             observation_size=env.observation_size,
@@ -45,14 +45,14 @@ if __name__ == "__main__":
             env,
             ctrl,
             net,
-            num_policy_samples=1,
+            num_policy_samples=4,
             log_dir="/tmp/gpc_crane",
             num_iters=10,
-            num_envs=4,
+            num_envs=128,
             num_videos=4,
             batch_size=128,
             num_epochs=10,
-            strategy="best",
+            strategy="policy",
         )
         policy.save(save_file)
         print(f"Saved policy to {save_file}")
