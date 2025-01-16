@@ -527,21 +527,33 @@ class CraneEnv(TrainingEnv):
         rng, pos_rng, vel_rng, target_rng = jax.random.split(rng, 4)
 
         # Crane state
-        # TODO: generate a reasonable set of initial conditions that don't drive
-        # the simulation unstable - or modify the simulation to be more stable
-        # from arbitrary initial conditions.
+        # TODO: figure out a more principled way to initialize these
+        q_lim = jnp.array(
+            [
+                [-1.0, 1.0],  # slew
+                [0.0, 1.0],  # luff
+                [0.0, 2.0],  # hoist (?)
+                [1.0, 2.2],  # payload x-pos
+                [-0.5, 0.5],  # payload y-pos
+                [1.0, 1.0],  # payload orientation (fixed upright)
+                [0.0, 0.0],
+                [0.0, 0.0],
+                [0.0, 0.0],
+            ]
+        )
         qpos = self.task.model.qpos0 + jax.random.uniform(
-            pos_rng, (self.task.model.nq,), minval=-0.0, maxval=0.0
+            pos_rng,
+            (self.task.model.nq,),
+            minval=q_lim[:, 0],
+            maxval=q_lim[:, 1],
         )
         qvel = jax.random.uniform(
-            vel_rng, (self.task.model.nv,), minval=-0.0, maxval=0.0
+            vel_rng, (self.task.model.nv,), minval=-0.1, maxval=0.1
         )
 
         # Target position
         pos_min = jnp.array([-1.0, 1.2, 0.0])
         pos_max = jnp.array([1.0, 2.2, 1.0])
-        # pos_min = jnp.array([0.05, 2.0, 0.3])
-        # pos_max = jnp.array([0.05, 2.0, 0.3])
         target_pos = jax.random.uniform(
             target_rng, (3,), minval=pos_min, maxval=pos_max
         )

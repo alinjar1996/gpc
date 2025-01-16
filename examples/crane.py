@@ -28,7 +28,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     # Set up the environment and save file
-    env = CraneEnv(episode_length=300)
+    env = CraneEnv(episode_length=500)
     save_file = "/tmp/crane_policy.pkl"
 
     if args.task == "train":
