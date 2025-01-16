@@ -7,6 +7,7 @@ import numpy as np
 from flax.struct import dataclass
 from hydrax.task_base import Task
 from hydrax.tasks.cart_pole import CartPole
+from hydrax.tasks.crane import Crane
 from hydrax.tasks.cube import CubeRotation
 from hydrax.tasks.double_cart_pole import DoubleCartPole
 from hydrax.tasks.humanoid import Humanoid
@@ -512,3 +513,56 @@ class CubeEnv(TrainingEnv):
     def observation_size(self) -> int:
         """The size of the observation space."""
         return 48
+
+
+class CraneEnv(TrainingEnv):
+    """Training environment for the luffing crane end-effetor tracking task."""
+
+    def __init__(self, episode_length: int = 100) -> None:
+        """Set up the particle training environment."""
+        super().__init__(task=Crane(), episode_length=episode_length)
+
+    def reset(self, data: mjx.Data, rng: jax.Array) -> mjx.Data:
+        """Reset the simulator to start a new episode."""
+        rng, pos_rng, vel_rng, target_rng = jax.random.split(rng, 4)
+
+        # Crane state
+        # TODO: generate a reasonable set of initial conditions that don't drive
+        # the simulation unstable - or modify the simulation to be more stable
+        # from arbitrary initial conditions.
+        qpos = self.task.model.qpos0 + jax.random.uniform(
+            pos_rng, (self.task.model.nq,), minval=-0.1, maxval=0.1
+        )
+        qvel = jax.random.uniform(
+            vel_rng, (self.task.model.nv,), minval=-0.1, maxval=0.1
+        )
+
+        # Target position
+        pos_min = jnp.array([-1.0, 1.2, 0.0])
+        pos_max = jnp.array([1.0, 2.2, 1.0])
+        target_pos = jax.random.uniform(
+            target_rng, (3,), minval=pos_min, maxval=pos_max
+        )
+        mocap_pos = data.mocap_pos.at[0].set(target_pos)
+
+        # Target orientation - this is unused but must be set so vectorization
+        # (which is determined by the size of rng) works properly.
+        target_quat = jnp.array([1.0, 0.0, 0.0, 0.0]) + jax.random.uniform(
+            target_rng, (4,), minval=-0.0, maxval=0.0
+        )
+        mocap_quat = data.mocap_quat.at[0].set(target_quat)
+
+        return data.replace(
+            qpos=qpos, qvel=qvel, mocap_pos=mocap_pos, mocap_quat=mocap_quat
+        )
+
+    def get_obs(self, data: mjx.Data) -> jax.Array:
+        """Observe the full crane state, plus end-effector pos/vel."""
+        ee_pos = self.task._get_payload_position(data)
+        ee_vel = self.task._get_payload_velocity(data)
+        return jnp.concatenate([ee_pos, ee_vel, data.qpos, data.qvel])
+
+    @property
+    def observation_size(self) -> int:
+        """The size of the observation space."""
+        return 26 - 7
