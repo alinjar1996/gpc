@@ -2,12 +2,14 @@ import shutil
 import time
 from pathlib import Path
 
+import evosax
 import jax
 import jax.numpy as jnp
 import matplotlib.pyplot as plt
 import optax
+import pytest
 from flax import nnx
-from hydrax.algs import PredictiveSampling
+from hydrax.algs import Evosax, PredictiveSampling
 
 from gpc.architectures import DenoisingMLP
 from gpc.augmented import PolicyAugmentedController
@@ -121,7 +123,6 @@ def test_train() -> None:
     log_dir.mkdir(parents=True, exist_ok=True)
 
     env = ParticleEnv()
-    ctrl = PredictiveSampling(env.task, num_samples=8, noise_level=0.1)
     net = DenoisingMLP(
         action_size=env.task.model.nu,
         observation_size=env.observation_size,
@@ -129,6 +130,22 @@ def test_train() -> None:
         hidden_layers=[32, 32],
         rngs=nnx.Rngs(0),
     )
+
+    # Try training with an incompatible controller
+    with pytest.raises(AssertionError):
+        invalid_ctrl = Evosax(env.task, evosax.Sep_CMA_ES, num_samples=8)
+        policy = train(
+            env,
+            invalid_ctrl,
+            net,
+            num_policy_samples=2,
+            log_dir=log_dir,
+            num_iters=1,
+            num_envs=4,
+        )
+
+    # Train with predictive sampling
+    ctrl = PredictiveSampling(env.task, num_samples=8, noise_level=0.1)
     policy = train(
         env,
         ctrl,

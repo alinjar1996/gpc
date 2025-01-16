@@ -278,6 +278,13 @@ def train(  # noqa: PLR0915 this is a long function, don't limit to 50 lines
     assert jnp.all(jnp.isfinite(env.task.u_min))
     assert jnp.all(jnp.isfinite(env.task.u_max))
 
+    # Check that the sampling-based predictive controller is compatible. In
+    # particular, we need access to the mean of the sampling distribution.
+    _spc_params = ctrl.init_params()
+    assert hasattr(
+        _spc_params, "mean"
+    ), f"Controller '{type(ctrl).__name__}' is not compatible with GPC."
+
     # Print some information about the training setup
     episode_seconds = env.episode_length * env.task.model.opt.timestep
     horizon_seconds = env.task.planning_horizon * env.task.dt
