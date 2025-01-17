@@ -35,7 +35,7 @@ if __name__ == "__main__":
         # Train the policy and save it to a file
         ctrl = MPPI(
             env.task,
-            num_samples=128,
+            num_samples=32,
             noise_level=1.0,
             temperature=0.1,
             num_randomizations=2,
@@ -45,19 +45,21 @@ if __name__ == "__main__":
             observation_size=env.observation_size,
             horizon=env.task.planning_horizon,
             feature_dims=(128,) * 3,
+            timestep_embedding_dim=64,
             rngs=nnx.Rngs(0),
         )
         policy = train(
             env,
             ctrl,
             net,
-            num_policy_samples=1,
+            num_policy_samples=32,
             log_dir="/tmp/gpc_humanoid",
             num_epochs=10,
             num_iters=50,
-            num_envs=256,
+            num_envs=128,
             num_videos=2,
             checkpoint_every=1,
+            strategy="best",
         )
         policy.save(save_file)
         print(f"Saved policy to {save_file}")
