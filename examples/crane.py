@@ -3,6 +3,7 @@ import argparse
 import mujoco
 from flax import nnx
 from hydrax.algs import PredictiveSampling
+from hydrax.risk import ConditionalValueAtRisk
 from hydrax.simulation.deterministic import run_interactive as run_sampling
 
 from gpc.architectures import DenoisingCNN
@@ -29,11 +30,17 @@ if __name__ == "__main__":
 
     # Set up the environment and save file
     env = CraneEnv(episode_length=500)
-    save_file = "/tmp/crane_policy.pkl"
+    save_file = "/tmp/crane_policy_cvar.pkl"
 
     if args.task == "train":
         # Train the policy and save it to a file
-        ctrl = PredictiveSampling(env.task, num_samples=4, noise_level=0.05)
+        ctrl = PredictiveSampling(
+            env.task,
+            num_samples=4,
+            noise_level=0.05,
+            num_randomizations=8,
+            risk_strategy=ConditionalValueAtRisk(0.25),
+        )
         net = DenoisingCNN(
             action_size=env.task.model.nu,
             observation_size=env.observation_size,
