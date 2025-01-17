@@ -74,15 +74,25 @@ if __name__ == "__main__":
         ctrl = BootstrappedPredictiveSampling(
             policy,
             env.get_obs,
-            num_policy_samples=64,
+            num_policy_samples=128,
+            warm_start_level=0.0,
             task=env.task,
-            num_samples=64,
-            noise_level=1.0,
+            num_samples=128,
+            noise_level=0.5,
+            num_randomizations=2,
         )
 
+        # Use a higher resolution model
         mj_model = env.task.mj_model
+        mj_model.opt.timestep = 0.02
+        mj_model.opt.iterations = 100
+        mj_model.opt.ls_iterations = 50
+
+        # Start from a falling position
         mj_data = mujoco.MjData(mj_model)
-        run_sampling(ctrl, mj_model, mj_data, frequency=50)
+        mj_data.qpos[3:7] = [0.7, 0.0, 0.7, 0.0]
+
+        run_sampling(ctrl, mj_model, mj_data, frequency=50, show_traces=False)
 
     else:
         parser.print_help()

@@ -30,7 +30,7 @@ if __name__ == "__main__":
 
     # Set up the environment and save file
     env = CraneEnv(episode_length=500)
-    save_file = "/tmp/crane_policy_cvar.pkl"
+    save_file = "/tmp/crane_policy_avg.pkl"
 
     if args.task == "train":
         # Train the policy and save it to a file
@@ -39,7 +39,7 @@ if __name__ == "__main__":
             num_samples=4,
             noise_level=0.05,
             num_randomizations=8,
-            risk_strategy=ConditionalValueAtRisk(0.25),
+            # risk_strategy=ConditionalValueAtRisk(0.25),
         )
         net = DenoisingCNN(
             action_size=env.task.model.nu,
