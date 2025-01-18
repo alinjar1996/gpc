@@ -6,6 +6,9 @@ import jax.numpy as jnp
 import mujoco
 import mujoco.viewer
 from mujoco import mjx
+import numpy as np
+
+np.random.seed(0)
 
 from gpc.envs import TrainingEnv
 from gpc.policy import Policy
@@ -55,6 +58,9 @@ def test_interactive(
         return env.get_obs(mjx_data)
 
     # Run the simulation
+    count = 0
+    last_time = 0
+    vels = []
     with mujoco.viewer.launch_passive(mj_model, mj_data) as viewer:
         while viewer.is_running():
             st = time.time()
@@ -88,6 +94,40 @@ def test_interactive(
             elapsed = time.time() - st
             if elapsed < mj_model.opt.timestep:
                 time.sleep(mj_model.opt.timestep - elapsed)
+
+            # Record current target error
+            sensor_adr = mj_model.sensor_adr[
+                mj_model.sensor("payload_pos").id
+            ]
+            err = mj_data.sensordata[sensor_adr : sensor_adr + 3]
+
+            # Record current velocity
+            sensor_adr = mj_model.sensor_adr[
+                mj_model.sensor("payload_vel").id
+            ]
+            vel = mj_data.sensordata[sensor_adr : sensor_adr + 3]
+            vels.append(jnp.linalg.norm(vel))
+
+            if np.linalg.norm(err) < 0.15 or mj_data.time - last_time > 10:
+                # Reset to a new target
+                pos_min = np.array([-1.5, 1.0, 0.0])
+                pos_max = np.array([1.5, 2.0, 1.5])
+                target = np.random.uniform(pos_min, pos_max)
+                mj_data.mocap_pos[0] = target
+                last_time = mj_data.time
+                count += 1
+
+            if count > 50:
+                break
+
+    print("")
+    print("Hit 50 targets in: ", mj_data.time, " seconds")
+
+    print("Average payload velocity: ", np.mean(vels))
+    print("Max payload velocity: ", np.max(vels))
+
+    np.save("vels_cvar.npy", vels)
+
 
     # Save what was last in the print buffer
     print("")

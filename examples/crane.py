@@ -30,7 +30,7 @@ if __name__ == "__main__":
 
     # Set up the environment and save file
     env = CraneEnv(episode_length=500)
-    save_file = "/tmp/crane_policy_avg.pkl"
+    save_file = "/tmp/crane_policy_cvar.pkl"
 
     if args.task == "train":
         # Train the policy and save it to a file
@@ -39,7 +39,7 @@ if __name__ == "__main__":
             num_samples=4,
             noise_level=0.05,
             num_randomizations=8,
-            # risk_strategy=ConditionalValueAtRisk(0.25),
+            risk_strategy=ConditionalValueAtRisk(0.25),
         )
         net = DenoisingCNN(
             action_size=env.task.model.nu,
@@ -70,7 +70,10 @@ if __name__ == "__main__":
         # Load the policy from a file and test it interactively
         print(f"Loading policy from {save_file}")
         policy = Policy.load(save_file)
-        test_interactive(env, policy)
+
+        mj_data = mujoco.MjData(env.task.mj_model)
+        mj_data.mocap_pos[0] = [0.0, 1.5, 0.8]
+        test_interactive(env, policy, mj_data)
 
     elif args.task == "sample":
         # Use the policy to bootstrap sampling-based MPC
