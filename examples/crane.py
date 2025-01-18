@@ -30,7 +30,7 @@ if __name__ == "__main__":
 
     # Set up the environment and save file
     env = CraneEnv(episode_length=500)
-    save_file = "/tmp/crane_policy_cvar.pkl"
+    save_file = "/tmp/crane_policy.pkl"
 
     if args.task == "train":
         # Train the policy and save it to a file
@@ -73,6 +73,13 @@ if __name__ == "__main__":
 
         mj_data = mujoco.MjData(env.task.mj_model)
         mj_data.mocap_pos[0] = [0.0, 1.5, 0.8]
+
+        env.task.mj_model.dof_damping *= 0.01
+        env.task.mj_model.body_mass[env.task.mj_model.body("payload").id] *= 1.5
+        env.task.mj_model.body_inertia[
+            env.task.mj_model.body("payload").id
+        ] *= 1.5
+
         test_interactive(env, policy, mj_data)
 
     elif args.task == "sample":
