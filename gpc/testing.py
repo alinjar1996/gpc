@@ -55,9 +55,6 @@ def test_interactive(
         return env.get_obs(mjx_data)
 
     # Run the simulation
-    times = []
-    tip_heights = []
-    controls = []
     with mujoco.viewer.launch_passive(mj_model, mj_data) as viewer:
         while viewer.is_running():
             st = time.time()
@@ -91,37 +88,6 @@ def test_interactive(
             elapsed = time.time() - st
             if elapsed < mj_model.opt.timestep:
                 time.sleep(mj_model.opt.timestep - elapsed)
-
-            # Get the height of the tip of the pendulum
-            tip_height = mj_data.site_xpos[task.tip_id][2]
-            tip_heights.append(tip_height)
-            times.append(mj_data.time)
-            controls.append(actions[0])
-
-            if mj_data.time > 10:
-                break
-
-    import matplotlib.pyplot as plt
-
-    plt.figure()
-    plt.plot(times, tip_heights)
-    plt.xlabel("Time")
-    plt.ylabel("Tip height")
-
-    plt.figure()
-    plt.plot(times, controls)
-    plt.xlabel("Time")
-    plt.ylabel("Action")
-
-    import numpy as np
-    np.save("tip_heights_1.npy", np.array(tip_heights))
-    np.save("times_1.npy", np.array(times))
-    np.save("controls_1.npy", np.array(controls))
-
-
-    plt.show()
-
-
 
     # Save what was last in the print buffer
     print("")
