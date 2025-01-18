@@ -33,7 +33,7 @@ if __name__ == "__main__":
 
     if args.task == "train":
         # Train the policy and save it to a file
-        ctrl = PredictiveSampling(env.task, num_samples=8, noise_level=0.3)
+        ctrl = PredictiveSampling(env.task, num_samples=16, noise_level=0.3)
         net = DenoisingMLP(
             action_size=env.task.model.nu,
             observation_size=env.observation_size,
@@ -45,11 +45,11 @@ if __name__ == "__main__":
             env,
             ctrl,
             net,
-            num_policy_samples=8,
+            num_policy_samples=16,
             log_dir="/tmp/gpc_double_cart_pole",
-            num_iters=15,
-            num_envs=1024,
-            num_epochs=10,
+            num_iters=50,
+            num_envs=256,
+            num_epochs=100,
             checkpoint_every=5,
             num_videos=4,
         )
