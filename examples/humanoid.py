@@ -88,7 +88,7 @@ if __name__ == "__main__":
         mj_model.opt.timestep = 0.01
 
         mj_data = mujoco.MjData(mj_model)
-        mj_data.qpos[3:7] = [0.7, 0.0, 0.7, 0.0]
+        mj_data.qpos[3:7] = [-0.7, 0.0, 0.7, 0.0]
 
         run_sampling(ctrl, mj_model, mj_data, frequency=50)
 
