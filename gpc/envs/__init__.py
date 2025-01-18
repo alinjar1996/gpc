@@ -14,7 +14,6 @@ __all__ = [
     "TrainingEnv",
     "CartPoleEnv",
     "CraneEnv",
-    "CubeEnv",
     "DoubleCartPoleEnv",
     "HumanoidEnv",
     "ParticleEnv",

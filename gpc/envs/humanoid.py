@@ -45,5 +45,5 @@ class HumanoidEnv(TrainingEnv):
 
     @property
     def observation_size(self) -> int:
-        """The size of the observation space."""
+        """The size of the observations."""
         return 56
