@@ -60,7 +60,7 @@ if __name__ == "__main__":
         # Load the policy from a file and test it interactively
         print(f"Loading policy from {save_file}")
         policy = Policy.load(save_file)
-        test_interactive(env, policy, inference_timestep=0.1)
+        test_interactive(env, policy, inference_timestep=0.1, warm_start_level=1.0)
 
     elif args.task == "sample":
         # Use the policy to bootstrap sampling-based MPC
