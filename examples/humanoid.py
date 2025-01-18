@@ -90,7 +90,7 @@ if __name__ == "__main__":
         mj_data = mujoco.MjData(mj_model)
         mj_data.qpos[3:7] = [-0.7, 0.0, 0.7, 0.0]
 
-        run_sampling(ctrl, mj_model, mj_data, frequency=50)
+        run_sampling(ctrl, mj_model, mj_data, frequency=50, show_traces=False)
 
     else:
         parser.print_help()
