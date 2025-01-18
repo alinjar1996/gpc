@@ -77,7 +77,7 @@ if __name__ == "__main__":
             policy,
             env.get_obs,
             num_policy_samples=128,
-            warm_start_level=0.0,
+            warm_start_level=0.9,
             task=env.task,
             num_samples=128,
             noise_level=0.5,
