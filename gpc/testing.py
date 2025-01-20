@@ -56,6 +56,9 @@ def test_interactive(
 
     # Run the simulation
     with mujoco.viewer.launch_passive(mj_model, mj_data) as viewer:
+        viewer.cam.fixedcamid = 0
+        viewer.cam.type = 2
+
         while viewer.is_running():
             st = time.time()
 

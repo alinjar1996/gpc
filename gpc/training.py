@@ -184,7 +184,7 @@ def fit_policy(
         )
         weight = jax.lax.stop_gradient(jnp.exp(2 * (cosine_similarity - 1)))
 
-        return weight * jnp.mean(jnp.square(pred - target))
+        return jnp.mean(jnp.square(pred - target))
 
     def _train_step(
         model: nnx.Module,
