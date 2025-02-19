@@ -4,6 +4,10 @@ This repository contains code for the paper "Generative Predictive Control: Flow
 Matching Policies for Dynamic and Difficult-to-Demonstrate Task" by Vince Kurtz
 and Joel Burdick.
 
+| <img src="img/walker.png" width="200"> | <img src="img/crane.png" width="200"> | <img src="img/humanoid.png" width="200"> |
+|:-------------------------------:|:-----------------------------:|:--------------------------:|
+| <img src="img/cart_pole.png" width="200"> | <img src="img/double_cart_pole.png" width="200"> | <img src="img/pusht.png" width="200"> |
+
 Generative Predictive Control (GPC) is a supervised learning framework for
 training flow-matching policies on tasks that are difficult to demonstrate but
 easy to simulate. GPC alternates between generating training data with
@@ -11,7 +15,7 @@ easy to simulate. GPC alternates between generating training data with
 fitting a generative model to the data, and using the generative model to
 improve the sampling distribution.
 
-![summary](img/summary.png)
+<img src="img/summary.png" width="500">
 
 ## Install (Conda)
 
