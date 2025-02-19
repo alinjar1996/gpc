@@ -4,9 +4,15 @@ This repository contains code for the paper "Generative Predictive Control: Flow
 Matching Policies for Dynamic and Difficult-to-Demonstrate Task" by Vince Kurtz
 and Joel Burdick.
 
-| <img src="img/walker.png" width="200"> | <img src="img/crane.png" width="200"> | <img src="img/humanoid.png" width="200"> |
-|:-------------------------------:|:-----------------------------:|:--------------------------:|
-| <img src="img/cart_pole.png" width="200"> | <img src="img/double_cart_pole.png" width="200"> | <img src="img/pusht.png" width="200"> |
+This includes code for training and testing flow-matching policies on each of
+the robot systems shown below:
+
+[<img src="img/cart_pole.png" width="130">](examples/cart_pole.py)
+[<img src="img/double_cart_pole.png" width="130">](examples/double_cart_pole.py)
+[<img src="img/pusht.png" width="130">](examples/pusht.py)
+[<img src="img/walker.png" width="130">](examples/walker.py)
+[<img src="img/crane.png" width="130">](examples/crane.py)
+[<img src="img/humanoid.png" width="130">](examples/humanoid.py)
 
 Generative Predictive Control (GPC) is a supervised learning framework for
 training flow-matching policies on tasks that are difficult to demonstrate but
