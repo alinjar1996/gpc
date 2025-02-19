@@ -21,7 +21,9 @@ easy to simulate. GPC alternates between generating training data with
 fitting a generative model to the data, and using the generative model to
 improve the sampling distribution.
 
+<div align="center">
 <img src="img/summary.png" width="500">
+</div>
 
 ## Install (Conda)
 
@@ -44,7 +46,7 @@ Install the package and dependencies:
 pip install -e .
 ```
 
-## Usage
+## Examples
 
 Various examples can be found in the [`examples`](examples) directory. For
 example, to train a cart-pole swingup policy using GPC, run:
@@ -65,4 +67,51 @@ To see other command-line options, run
 
 ```bash
 python examples/cart_pole.py --help
+```
+
+## Using a Different Robot Model
+
+To try GPC on your own robot or task, you will need to:
+
+1. Define a [Hydrax
+   task](https://github.com/vincekurtz/hydrax?tab=readme-ov-file#design-your-own-task)
+   that encodes the cost function and system dynamics.
+2. Define a training environment that inherits from
+   [`gpc.envs.base.TrainingEnv`](gpc/envs/base.py). This must implement the
+   `reset`, `get_obs`, and `observation_size` methods. For example:
+
+```python
+class MyCustomEnv(TrainingEnv):
+    def __init__(self):
+        super().__init__(task=MyCustomHydraxTask(), episode_length=100)
+
+    def reset(self, data: mjx.Data, rng: jax.Array) -> mjx.Data:
+        """Reset the simulator to start a new episode."""
+        ...
+        return new_data
+
+    def get_obs(self, data: mjx.Data) -> jax.Array:
+        """Get the observation from the simulator."""
+        ...
+        return jax.array([obs1, obs2, ...])
+
+    @property
+    def observation_size(self) -> int:
+        """Return the size of the observation vector."""
+        ...
+```
+
+Then you should be able to run `gpc.training.train` to train a flow-matching
+policy, and `gpc.testing.test_interactive` to run an interactive simulation with
+the trained policy. See the environments in [`gpc.envs`](gpc/envs) for examples
+and additional details.
+
+## Citation
+
+```bibtex
+@misc{kurtz2025generative,
+  title={Generative Predictive Control: Flow Matching Policies for Dynamic and Difficult-to-Demonstrate Task},
+  author={Kurtz, Vince and Burdick, Joel},
+  year={2025},
+}
 ```
