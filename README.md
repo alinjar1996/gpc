@@ -1,8 +1,8 @@
 # Generative Predictive Control
 
-This repository contains code for the paper "Generative Predictive Control: Flow
-Matching Policies for Dynamic and Difficult-to-Demonstrate Task" by Vince Kurtz
-and Joel Burdick.
+This repository contains code for the paper ["Generative Predictive Control: Flow
+Matching Policies for Dynamic and Difficult-to-Demonstrate Tasks"](https://arxiv.org/abs/2502.13406)
+by Vince Kurtz and Joel Burdick. [Video summary](https://youtu.be/mjL7CF877Ow).
 
 This includes code for training and testing flow-matching policies on each of
 the robot systems shown below:
@@ -109,9 +109,10 @@ and additional details.
 ## Citation
 
 ```bibtex
-@misc{kurtz2025generative,
+@article{kurtz2025generative,
   title={Generative Predictive Control: Flow Matching Policies for Dynamic and Difficult-to-Demonstrate Task},
   author={Kurtz, Vince and Burdick, Joel},
+  journal={arXiv preprint arXiv:2502.13406},
   year={2025},
 }
 ```
