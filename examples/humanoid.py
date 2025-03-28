@@ -2,7 +2,7 @@ import argparse
 
 import mujoco
 from flax import nnx
-from hydrax.algs import MPPI
+from hydrax.algs import PredictiveSampling
 from hydrax.simulation.deterministic import run_interactive as run_sampling
 
 from gpc.architectures import DenoisingCNN
@@ -33,12 +33,10 @@ if __name__ == "__main__":
 
     if args.task == "train":
         # Train the policy and save it to a file
-        ctrl = MPPI(
+        ctrl = PredictiveSampling(
             env.task,
             num_samples=32,
-            noise_level=1.0,
-            temperature=0.1,
-            num_randomizations=2,
+            noise_level=0.3,
         )
         net = DenoisingCNN(
             action_size=env.task.model.nu,
@@ -59,7 +57,6 @@ if __name__ == "__main__":
             num_envs=128,
             num_videos=2,
             checkpoint_every=1,
-            strategy="best",
         )
         policy.save(save_file)
         print(f"Saved policy to {save_file}")
