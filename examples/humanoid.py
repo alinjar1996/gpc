@@ -28,7 +28,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     # Set up the environment and save file
-    env = HumanoidEnv(episode_length=400)
+    env = HumanoidEnv(episode_length=200)
     save_file = "/tmp/humanoid_policy.pkl"
 
     if args.task == "train":
@@ -36,7 +36,7 @@ if __name__ == "__main__":
         ctrl = PredictiveSampling(
             env.task,
             num_samples=32,
-            noise_level=0.3,
+            noise_level=0.2,
         )
         net = DenoisingCNN(
             action_size=env.task.model.nu,
