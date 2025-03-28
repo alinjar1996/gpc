@@ -1,6 +1,6 @@
 import jax
 import jax.numpy as jnp
-from hydrax.tasks.humanoid import Humanoid
+from hydrax.tasks.humanoid_standup import HumanoidStandup
 from mujoco import mjx
 
 from gpc.envs import TrainingEnv
@@ -11,7 +11,7 @@ class HumanoidEnv(TrainingEnv):
 
     def __init__(self, episode_length: int) -> None:
         """Set up the walker training environment."""
-        super().__init__(task=Humanoid(), episode_length=episode_length)
+        super().__init__(task=HumanoidStandup(), episode_length=episode_length)
 
     def reset(self, data: mjx.Data, rng: jax.Array) -> mjx.Data:
         """Reset the simulator to start a new episode."""
