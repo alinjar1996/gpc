@@ -86,13 +86,13 @@ if __name__ == "__main__":
         ctrl = BootstrappedPredictiveSampling(
             policy,
             env.get_obs,
-            num_policy_samples=0,
+            num_policy_samples=64,
             task=env.task,
-            num_samples=32,
+            num_samples=64,
             noise_level=0.1,
         )
-        evaluate(env, policy, num_initial_conditions=1000, num_loops=20)
-        # evaluate(env, ctrl, num_initial_conditions=1000, num_loops=20)
+        # evaluate(env, policy, num_initial_conditions=100, num_loops=20)
+        evaluate(env, ctrl, num_initial_conditions=100, num_loops=20)
 
     else:
         parser.print_help()
