@@ -91,3 +91,81 @@ def test_interactive(
 
     # Save what was last in the print buffer
     print("")
+
+
+def evaluate(
+    env: TrainingEnv,
+    policy: Policy,
+    num_initial_conditions: int,
+    inference_timestep: float = 0.1,
+    warm_start_level: float = 1.0,
+    seed: int = 0,
+) -> None:
+    """Perform a systematic performance evaluation of a GPC policy.
+
+    Runs the policy from a randomized set of initial conditions, and reports
+    the total cost of each run.
+
+    Args:
+        env: The environment, which defines the system to simulate.
+        policy: The GPC policy to test.
+        num_initial_conditions: The number of initial conditions to test.
+        inference_timestep: The timestep dt to use for flow matching inference.
+        warm_start_level: The warm start level to use for the policy.
+        seed: The random seed to use for the initial conditions.
+    """
+    rng = jax.random.key(seed)
+    task = env.task
+
+    # Set up the policy
+    policy = policy.replace(dt=inference_timestep)
+    policy.model.eval()
+
+    def policy_fn(
+        data: mjx.Data, action_tape: jax.Array, rng: jax.Array
+    ) -> jax.Array:
+        """Apply the policy, updating the given action sequence."""
+        data = mjx.forward(task.model, data)  # update sites & sensors
+        obs = env.get_obs(data)
+        action_tape = policy.apply(
+            action_tape, obs, rng, warm_start_level=warm_start_level
+        )
+        return action_tape
+
+    jit_policy = jax.jit(jax.vmap(policy_fn))
+
+    # Set the initial states
+    rng, init_rng = jax.random.split(rng)
+    init_rng = jax.random.split(init_rng, num_initial_conditions)
+    states = jax.jit(jax.vmap(env.init_state))(init_rng)
+
+    # Set up the simulation step function, x_{t+1} = f(x_t, u_t)
+    jit_step = jax.jit(jax.vmap(env.step))
+
+    # Set up the cost functions, l(x_t, u_t)
+    jit_running_cost = jax.jit(jax.vmap(env.task.running_cost))
+    jit_terminal_cost = jax.jit(jax.vmap(env.task.terminal_cost))
+
+    # Run the simulation
+    action_tapes = jnp.zeros(
+        (num_initial_conditions, task.planning_horizon, task.model.nu)
+    )
+    costs = jnp.zeros(num_initial_conditions)
+    num_sim_steps = int(task.planning_horizon * task.sim_steps_per_control_step)
+    for _ in range(num_sim_steps):
+        # Get actions from the policy
+        action_rng = jax.random.split(rng, num_initial_conditions)
+        action_tapes = jit_policy(states.data, action_tapes, action_rng)
+        actions = action_tapes[:, 0, :]
+
+        # Evaluate costs at current state
+        costs += jit_running_cost(states.data, actions)
+
+        # Advance the state
+        states = jit_step(states, actions)
+
+    # Compute the terminal cost
+    costs += jit_terminal_cost(states.data)
+
+    print(states.data.time)
+    print(costs)
