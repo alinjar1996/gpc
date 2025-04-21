@@ -99,6 +99,7 @@ def evaluate(
     num_initial_conditions: int,
     inference_timestep: float = 0.1,
     warm_start_level: float = 1.0,
+    num_loops: int = 1,
     seed: int = 0,
 ) -> None:
     """Perform a systematic performance evaluation of a GPC policy.
@@ -112,6 +113,7 @@ def evaluate(
         num_initial_conditions: The number of initial conditions to test.
         inference_timestep: The timestep dt to use for flow matching inference.
         warm_start_level: The warm start level to use for the policy.
+        num_loops: The number of times to loop through the simulation.
         seed: The random seed to use for the initial conditions.
     """
     rng = jax.random.key(seed)
@@ -152,20 +154,34 @@ def evaluate(
     )
     costs = jnp.zeros(num_initial_conditions)
     num_sim_steps = int(task.planning_horizon * task.sim_steps_per_control_step)
-    for _ in range(num_sim_steps):
-        # Get actions from the policy
-        action_rng = jax.random.split(rng, num_initial_conditions)
-        action_tapes = jit_policy(states.data, action_tapes, action_rng)
-        actions = action_tapes[:, 0, :]
+    for _ in range(num_loops):
+        for _ in range(num_sim_steps):
+            # Get actions from the policy
+            action_rng = jax.random.split(rng, num_initial_conditions)
+            action_tapes = jit_policy(states.data, action_tapes, action_rng)
+            actions = action_tapes[:, 0, :]
 
-        # Evaluate costs at current state
-        costs += jit_running_cost(states.data, actions)
+            # Evaluate costs at current state
+            costs += jit_running_cost(states.data, actions)
 
-        # Advance the state
-        states = jit_step(states, actions)
+            # Advance the state
+            states = jit_step(states, actions)
 
-    # Compute the terminal cost
-    costs += jit_terminal_cost(states.data)
+        # Compute the terminal cost
+        costs += jit_terminal_cost(states.data)
 
-    print(states.data.time)
-    print(costs)
+    # Normalize cost by the number of simulation steps
+    costs /= num_sim_steps * num_loops
+
+    # Print performance summary
+    final_time = states.data.time[0]
+    avg_cost = jnp.mean(costs)
+    std_cost = jnp.std(costs)
+
+    print(
+        (
+            f"Simulated from {num_initial_conditions} initial conditions "
+            f"for {final_time:.2f} seconds"
+        )
+    )
+    print(f"Average cost: {avg_cost:.2f} ± {std_cost:.2f}")

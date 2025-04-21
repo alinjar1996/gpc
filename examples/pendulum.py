@@ -83,7 +83,7 @@ if __name__ == "__main__":
         # Load the policy from a file and evaluate it
         print(f"Loading policy from {save_file}")
         policy = Policy.load(save_file)
-        evaluate(env, policy, num_initial_conditions=10)
+        evaluate(env, policy, num_initial_conditions=1000, num_loops=100)
 
     else:
         parser.print_help()
