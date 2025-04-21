@@ -9,7 +9,7 @@ from gpc.architectures import DenoisingCNN
 from gpc.envs import WalkerEnv
 from gpc.policy import Policy
 from gpc.sampling import BootstrappedPredictiveSampling
-from gpc.testing import test_interactive
+from gpc.testing import evaluate, test_interactive
 from gpc.training import train
 
 if __name__ == "__main__":
@@ -20,6 +20,7 @@ if __name__ == "__main__":
     )
     subparsers.add_parser("train", help="Train (and save) a generative policy")
     subparsers.add_parser("test", help="Test a generative policy")
+    subparsers.add_parser("eval", help="Evalute a generative policy")
     subparsers.add_parser(
         "sample", help="Bootstrap sampling-based MPC with a generative policy"
     )
@@ -78,6 +79,21 @@ if __name__ == "__main__":
         mj_model = env.task.mj_model
         mj_data = mujoco.MjData(mj_model)
         run_sampling(ctrl, mj_model, mj_data, frequency=50, fixed_camera_id=0)
+
+    elif args.task == "eval":
+        # Load the policy from a file and evaluate it
+        print(f"Loading policy from {save_file}")
+        policy = Policy.load(save_file)
+        ctrl = BootstrappedPredictiveSampling(
+            policy,
+            env.get_obs,
+            num_policy_samples=64,
+            task=env.task,
+            num_samples=64,
+            noise_level=0.3,
+        )
+        # evaluate(env, policy, num_initial_conditions=100, num_loops=17)
+        evaluate(env, ctrl, num_initial_conditions=100, num_loops=17)
 
     else:
         parser.print_help()
