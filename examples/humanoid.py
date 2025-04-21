@@ -9,7 +9,7 @@ from gpc.architectures import DenoisingCNN
 from gpc.envs import HumanoidEnv
 from gpc.policy import Policy
 from gpc.sampling import BootstrappedPredictiveSampling
-from gpc.testing import test_interactive
+from gpc.testing import evaluate, test_interactive
 from gpc.training import train
 
 if __name__ == "__main__":
@@ -22,6 +22,7 @@ if __name__ == "__main__":
     )
     subparsers.add_parser("train", help="Train (and save) a generative policy")
     subparsers.add_parser("test", help="Test a generative policy")
+    subparsers.add_parser("eval", help="Evalute a generative policy")
     subparsers.add_parser(
         "sample", help="Bootstrap sampling-based MPC with a generative policy"
     )
@@ -91,6 +92,12 @@ if __name__ == "__main__":
         mj_data.qpos[3:7] = [-0.7, 0.0, 0.7, 0.0]
 
         run_sampling(ctrl, mj_model, mj_data, frequency=50, show_traces=False)
+
+    elif args.task == "eval":
+        # Load the policy from a file and evaluate it
+        print(f"Loading policy from {save_file}")
+        policy = Policy.load(save_file)
+        evaluate(env, policy, num_initial_conditions=10, num_loops=1)
 
     else:
         parser.print_help()

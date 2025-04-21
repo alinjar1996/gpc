@@ -1,5 +1,6 @@
 import time
 from functools import partial
+from typing import Union
 
 import jax
 import jax.numpy as jnp
@@ -9,6 +10,7 @@ from mujoco import mjx
 
 from gpc.envs import TrainingEnv
 from gpc.policy import Policy
+from gpc.sampling import BootstrappedPredictiveSampling
 
 
 def test_interactive(
@@ -95,7 +97,7 @@ def test_interactive(
 
 def evaluate(
     env: TrainingEnv,
-    policy: Policy,
+    policy: Union[Policy, BootstrappedPredictiveSampling],
     num_initial_conditions: int,
     inference_timestep: float = 0.1,
     warm_start_level: float = 1.0,
@@ -120,21 +122,42 @@ def evaluate(
     task = env.task
 
     # Set up the policy
-    policy = policy.replace(dt=inference_timestep)
-    policy.model.eval()
+    if isinstance(policy, BootstrappedPredictiveSampling):
 
-    def policy_fn(
-        data: mjx.Data, action_tape: jax.Array, rng: jax.Array
-    ) -> jax.Array:
-        """Apply the policy, updating the given action sequence."""
-        data = mjx.forward(task.model, data)  # update sites & sensors
-        obs = env.get_obs(data)
-        action_tape = policy.apply(
-            action_tape, obs, rng, warm_start_level=warm_start_level
-        )
-        return action_tape
+        def policy_fn(
+            data: mjx.Data, action_tape: jax.Array, rng: jax.Array
+        ) -> jax.Array:
+            """Apply the policy, updating the given action sequence."""
+            data = mjx.forward(task.model, data)  # update sites & sensors
 
-    jit_policy = jax.jit(jax.vmap(policy_fn))
+            policy_params = policy.init_params()  # valid for PS/MPPI only
+            policy_params = policy_params.replace(
+                mean=action_tape,
+                rng=rng,
+            )
+
+            # Do the rollouts, storing the best one in the policy params
+            policy_params, _ = policy.optimize(data, policy_params)
+            return policy_params.mean
+
+        jit_policy = jax.jit(jax.vmap(policy_fn))
+
+    else:
+        policy = policy.replace(dt=inference_timestep)
+        policy.model.eval()
+
+        def policy_fn(
+            data: mjx.Data, action_tape: jax.Array, rng: jax.Array
+        ) -> jax.Array:
+            """Apply the policy, updating the given action sequence."""
+            data = mjx.forward(task.model, data)  # update sites & sensors
+            obs = env.get_obs(data)
+            action_tape = policy.apply(
+                action_tape, obs, rng, warm_start_level=warm_start_level
+            )
+            return action_tape
+
+        jit_policy = jax.jit(jax.vmap(policy_fn))
 
     # Set the initial states
     rng, init_rng = jax.random.split(rng)

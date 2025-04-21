@@ -69,9 +69,9 @@ if __name__ == "__main__":
         ctrl = BootstrappedPredictiveSampling(
             policy,
             env.get_obs,
-            num_policy_samples=4,
+            num_policy_samples=0,
             task=env.task,
-            num_samples=4,
+            num_samples=32,
             noise_level=0.1,
         )
 
@@ -83,7 +83,16 @@ if __name__ == "__main__":
         # Load the policy from a file and evaluate it
         print(f"Loading policy from {save_file}")
         policy = Policy.load(save_file)
-        evaluate(env, policy, num_initial_conditions=1000, num_loops=100)
+        ctrl = BootstrappedPredictiveSampling(
+            policy,
+            env.get_obs,
+            num_policy_samples=0,
+            task=env.task,
+            num_samples=32,
+            noise_level=0.1,
+        )
+        evaluate(env, policy, num_initial_conditions=1000, num_loops=20)
+        # evaluate(env, ctrl, num_initial_conditions=1000, num_loops=20)
 
     else:
         parser.print_help()
