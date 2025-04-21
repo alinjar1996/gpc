@@ -179,6 +179,8 @@ def evaluate(
     num_sim_steps = int(task.planning_horizon * task.sim_steps_per_control_step)
     for _ in range(num_loops):
         for _ in range(num_sim_steps):
+            print(f"t = {states.data.time[0]:.2f}", end="\r")
+
             # Get actions from the policy
             action_rng = jax.random.split(rng, num_initial_conditions)
             action_tapes = jit_policy(states.data, action_tapes, action_rng)

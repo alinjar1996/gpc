@@ -97,7 +97,16 @@ if __name__ == "__main__":
         # Load the policy from a file and evaluate it
         print(f"Loading policy from {save_file}")
         policy = Policy.load(save_file)
-        evaluate(env, policy, num_initial_conditions=10, num_loops=1)
+        ctrl = BootstrappedPredictiveSampling(
+            policy,
+            env.get_obs,
+            num_policy_samples=0,
+            task=env.task,
+            num_samples=128,
+            noise_level=0.5,
+        )
+        # evaluate(env, policy, num_initial_conditions=100, num_loops=17)
+        evaluate(env, ctrl, num_initial_conditions=100, num_loops=17)
 
     else:
         parser.print_help()
