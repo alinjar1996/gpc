@@ -10,7 +10,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 # Set a serif fonts and a larger font size
-plt.rcParams.update({"font.size": 16})
+plt.rcParams.update({"font.size": 20})
 plt.rcParams["font.family"] = "serif"
 
 # Labels for each task
@@ -39,9 +39,9 @@ both_stds = [0.29, 0.47, 1.73, 0.25, 0.20, 0.33, 0.41]
 # Compute 95% confidence intervals
 N = 100  # number of samples
 
-spc_ci = np.array(spc_stds) / np.sqrt(N) * 1.96
-gpc_ci = np.array(gpc_stds) / np.sqrt(N) * 1.96
-both_ci = np.array(both_stds) / np.sqrt(N) * 1.96
+spc_ci = np.array(spc_stds)  # / np.sqrt(N) * 1.96
+gpc_ci = np.array(gpc_stds)  # / np.sqrt(N) * 1.96
+both_ci = np.array(both_stds)  # / np.sqrt(N) * 1.96
 
 # Make a histogram of the data, with each task as a separate subplot. In each
 # subplot, show a bar with whiskers for the confidence interfal for SPC, GPC,
@@ -49,9 +49,9 @@ both_ci = np.array(both_stds) / np.sqrt(N) * 1.96
 num_tasks = len(labels)
 fig, ax = plt.subplots(1, num_tasks, figsize=(20, 5))
 
-ax[0].set_ylabel("Avg. Cost Per Step")
+ax[0].set_ylabel("Cost Per Step")
 for i in range(num_tasks):
-    xlabels = ["SPC", "GPC", "GPC + SPC"]
+    xlabels = ["SPC", "GPC", "GPC+"]
     means = [spc_means[i], gpc_means[i], both_means[i]]
     CIs = [spc_ci[i], gpc_ci[i], both_ci[i]]
     ax[i].bar(
@@ -64,6 +64,7 @@ for i in range(num_tasks):
     )
     ax[i].set_title(labels[i])
     ax[i].tick_params(axis="x", rotation=45)
+    ax[i].set_ylim((0, None))
 
 plt.tight_layout()
 plt.show()
