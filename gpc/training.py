@@ -247,6 +247,7 @@ def train(  # noqa: PLR0915 this is a long function, don't limit to 50 lines
     num_videos: int = 2,
     video_fps: int = 10,
     strategy: str = "policy",
+    seed: int = 0,
 ) -> None:
     """Train a generative predictive controller.
 
@@ -270,9 +271,10 @@ def train(  # noqa: PLR0915 this is a long function, don't limit to 50 lines
         strategy: The strategy for choosing a control action to advance the
                   simulation during the data collection phase. "policy" uses the
                   first policy sample, while "best" agregates all samples.
+        seed: The random number generator seed.
 
     """
-    rng = jax.random.key(0)
+    rng = jax.random.key(seed)
 
     # Check that the task has finite input bounds
     assert jnp.all(jnp.isfinite(env.task.u_min))
