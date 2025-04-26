@@ -34,6 +34,7 @@ if __name__ == "__main__":
 
     if args.task == "train":
         # Train the policy and save it to a file
+        seed = 0
         ctrl = PredictiveSampling(env.task, num_samples=4, noise_level=0.05)
         net = DenoisingCNN(
             action_size=env.task.model.nu,
@@ -41,14 +42,14 @@ if __name__ == "__main__":
             horizon=env.task.planning_horizon,
             feature_dims=[64, 64],
             timestep_embedding_dim=16,
-            rngs=nnx.Rngs(0),
+            rngs=nnx.Rngs(seed),
         )
         policy = train(
             env,
             ctrl,
             net,
             num_policy_samples=2,
-            log_dir="/tmp/gpc_crane",
+            log_dir="/home/vkurtz/gpc_policies/training_logs/gpc_crane",
             num_iters=10,
             num_envs=512,
             num_videos=4,
@@ -56,6 +57,7 @@ if __name__ == "__main__":
             num_epochs=20,
             checkpoint_every=5,
             strategy="policy",
+            seed=seed,
         )
         policy.save(save_file)
         print(f"Saved policy to {save_file}")

@@ -34,23 +34,25 @@ if __name__ == "__main__":
 
     if args.task == "train":
         # Train the policy and save it to a file
+        seed = 2
         ctrl = PredictiveSampling(env.task, num_samples=8, noise_level=0.1)
         net = DenoisingMLP(
             action_size=env.task.model.nu,
             observation_size=env.observation_size,
             horizon=env.task.planning_horizon,
             hidden_layers=[64, 64],
-            rngs=nnx.Rngs(0),
+            rngs=nnx.Rngs(seed),
         )
         policy = train(
             env,
             ctrl,
             net,
             num_policy_samples=2,
-            log_dir="/tmp/gpc_cart_pole",
+            log_dir="/home/vkurtz/gpc_policies/training_logs/gpc_cart_pole",
             num_iters=10,
             num_envs=128,
             num_epochs=100,
+            seed=seed,
         )
         policy.save(save_file)
         print(f"Saved policy to {save_file}")
