@@ -32,7 +32,7 @@ if __name__ == "__main__":
 
     if args.task == "train":
         # Train the policy and save it to a file
-        seed = 0
+        seed = 2
         ctrl = PredictiveSampling(env.task, num_samples=16, noise_level=0.3)
         net = DenoisingCNN(
             action_size=env.task.model.nu,

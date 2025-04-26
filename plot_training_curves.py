@@ -6,12 +6,16 @@
 import matplotlib.pyplot as plt
 import numpy as np
 from tensorboard.backend.event_processing import event_accumulator as ea
+
+
 def get_data(log_file, name):
     """Get the values of a particular scalar from a TensorBoard log file"""
     ea_ = ea.EventAccumulator(log_file)
     ea_.Reload()
     data = ea_.Scalars(name)
     return np.array([x.value for x in data])
+
+
 # Set up the plot
 plt.rcParams.update({"font.size": 18})
 plt.rcParams.update({"font.family": "serif"})
@@ -28,7 +32,7 @@ examples = {
         "/home/vkurtz/gpc_policies/training_logs/gpc_cart_pole/20250426_104632",
         "/home/vkurtz/gpc_policies/training_logs/gpc_cart_pole/20250426_104858",
     ],
-    "Double Cart-Pole": [
+    "Double\nCart-Pole": [
         "/home/vkurtz/gpc_policies/training_logs/gpc_double_cart_pole/20250426_105347",
         "/home/vkurtz/gpc_policies/training_logs/gpc_double_cart_pole/20250426_111134",
         "/home/vkurtz/gpc_policies/training_logs/gpc_double_cart_pole/20250426_112850",
@@ -43,7 +47,11 @@ examples = {
         "/home/vkurtz/gpc_policies/training_logs/gpc_walker/20250426_125828",
         "/home/vkurtz/gpc_policies/training_logs/gpc_walker/20250426_131114",
     ],
-    # "Crane": "/home/vkurtz/gpc_policies/training_logs/gpc_crane/20250117_145939",
+    "Crane": [
+        "/home/vkurtz/gpc_policies/training_logs/gpc_crane/20250426_132111",
+        "/home/vkurtz/gpc_policies/training_logs/gpc_crane/20250426_132949",
+        "/home/vkurtz/gpc_policies/training_logs/gpc_crane/20250426_133617",
+    ],
     # "Humanoid": "/home/vkurtz/gpc_policies/training_logs/gpc_humanoid/20250117_221301",
 }
 i = 0
@@ -59,13 +67,12 @@ for name, log_files in examples.items():
         iters = np.arange(1, len(loss) + 1)
 
         # Plot the data
-        ax[0, i].plot(iters, loss, linewidth=3)
+        ax[0, i].plot(iters, cost, linewidth=3)
         ax[1, i].plot(iters, 100 * frac, linewidth=3)
-        ax[2, i].plot(iters, cost, linewidth=3)
+        ax[2, i].plot(iters, loss, linewidth=3)
 
     # Set formatting and labels
     ax[0, i].set_title(name)
-        # ax[1, i].set_ylim([0, 100])
     for j in range(3):
         ax[j, i].set_xticks([iters[0], iters[-1]])
     ax[0, i].yaxis.set_major_formatter(
@@ -75,8 +82,8 @@ for name, log_files in examples.items():
     i += 1
 
 # Set labels for the first column
-ax[0, 0].set_ylabel("Loss")
+ax[0, 0].set_ylabel("Cost")
 ax[1, 0].set_ylabel("Best %")
-ax[2, 0].set_ylabel("Cost")
+ax[2, 0].set_ylabel("Loss")
 plt.tight_layout()
 plt.show()
