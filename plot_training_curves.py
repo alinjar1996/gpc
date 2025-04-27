@@ -52,7 +52,11 @@ examples = {
         "/home/vkurtz/gpc_policies/training_logs/gpc_crane/20250426_132949",
         "/home/vkurtz/gpc_policies/training_logs/gpc_crane/20250426_133617",
     ],
-    # "Humanoid": "/home/vkurtz/gpc_policies/training_logs/gpc_humanoid/20250117_221301",
+    "Humanoid": [
+        "/home/vkurtz/gpc_policies/training_logs/gpc_humanoid/20250426_134622",
+        "/home/vkurtz/gpc_policies/training_logs/gpc_humanoid/20250426_164058",
+        "/home/vkurtz/gpc_policies/training_logs/gpc_humanoid/20250426_190455",
+    ],
 }
 i = 0
 for name, log_files in examples.items():
@@ -75,6 +79,8 @@ for name, log_files in examples.items():
     ax[0, i].set_title(name)
     for j in range(3):
         ax[j, i].set_xticks([iters[0], iters[-1]])
+        if name == "Humanoid":
+            ax[j, i].set_xlim(0, 20)
     ax[0, i].yaxis.set_major_formatter(
         plt.FuncFormatter(lambda x, _: f"{x:.2f}")
     )

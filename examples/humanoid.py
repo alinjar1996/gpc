@@ -34,7 +34,7 @@ if __name__ == "__main__":
 
     if args.task == "train":
         # Train the policy and save it to a file
-        seed = 0
+        seed = 2
         ctrl = MPPI(
             env.task,
             num_samples=32,
@@ -57,7 +57,7 @@ if __name__ == "__main__":
             num_policy_samples=32,
             log_dir="/home/vkurtz/gpc_policies/training_logs/gpc_humanoid",
             num_epochs=10,
-            num_iters=50,
+            num_iters=20,
             num_envs=128,
             num_videos=0,
             checkpoint_every=10,
