@@ -30,8 +30,8 @@ def train(path: str) -> None:
 
     # Define value and policy networks
     network_wrapper = BraxPPONetworksWrapper(
-        policy_network=MLP(layer_sizes=(16, 2)),
-        value_network=MLP(layer_sizes=(16, 1)),
+        policy_network=MLP(layer_sizes=(32, 32, 2)),
+        value_network=MLP(layer_sizes=(32, 32, 1)),
         action_distribution=distribution.NormalTanhDistribution,
     )
 
@@ -41,8 +41,8 @@ def train(path: str) -> None:
         network_wrapper=network_wrapper,
         save_path=save_path,
         tensorboard_logdir=log_path,
-        num_timesteps=1_000_000,
-        num_evals=30,
+        num_timesteps=2_560_000,
+        num_evals=10,
         reward_scaling=1.0,
         episode_length=episode_length,
         normalize_observations=True,
@@ -51,9 +51,9 @@ def train(path: str) -> None:
         num_updates_per_batch=8,
         discounting=0.97,
         learning_rate=1e-3,
-        entropy_cost=1e-3,
-        num_envs=2048,
-        batch_size=1024,
+        entropy_cost=0.0,
+        num_envs=128,
+        batch_size=128,
         seed=0,
     )
 
