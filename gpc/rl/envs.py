@@ -3,13 +3,6 @@ from brax.envs.base import PipelineEnv, State
 
 from gpc.envs import TrainingEnv
 
-##
-#
-# Tools for training RL policies using the same dynamics and objective function
-# as GPC.
-#
-##
-
 
 class BraxEnv(PipelineEnv):
     """Brax wrapper for GPC training environments.
@@ -37,10 +30,10 @@ class BraxEnv(PipelineEnv):
 
         obs = self.env.get_obs(mjx_data)
 
-        reward = 0
-        done = 0
+        reward = 0.0
+        done = 0.0
         metrics = {
-            "timestep:": gpc_state.t,
+            "timestep": gpc_state.t,
             "cost": -reward,
         }
         return State(gpc_state, obs, reward, done, metrics)
@@ -63,12 +56,15 @@ class BraxEnv(PipelineEnv):
         )
 
         obs = self.env.get_obs(gpc_state.data)
-        done = 0
-        metrics = {
-            "timestep": gpc_state.t,
-            "cost": -reward,
-        }
-        return State(gpc_state, obs, reward, done, metrics)
+        state.metrics.update(
+            timestep=gpc_state.t,
+            cost=-reward,
+        )
+        return state.replace(
+            pipeline_state=gpc_state,
+            obs=obs,
+            reward=reward,
+        )
 
     @property
     def observation_size(self) -> int:

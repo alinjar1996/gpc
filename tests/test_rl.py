@@ -1,7 +1,18 @@
-import jax
+import pickle
+from pathlib import Path
 
-from gpc.envs import ParticleEnv
-from gpc.rl import BraxEnv
+import jax
+import jax.numpy as jnp
+from brax.training import distribution
+
+from gpc.envs import ParticleEnv, PendulumEnv
+from gpc.rl.envs import BraxEnv
+from gpc.rl.ppo import (
+    MLP,
+    BraxPPONetworksWrapper,
+    make_policy_function,
+    train_ppo,
+)
 
 
 def test_brax_env() -> None:
@@ -36,5 +47,85 @@ def test_brax_env() -> None:
     assert brax_state.pipeline_state.t == 0
 
 
+def test_ppo() -> None:
+    """Test basic PPO training."""
+    rng = jax.random.key(0)
+
+    # Set up a simple pendulum swingup environment
+    env = BraxEnv(PendulumEnv(episode_length=100))
+    observation_size = env.observation_size
+    action_size = env.action_size
+
+    # Define value and policy networks
+    network_wrapper = BraxPPONetworksWrapper(
+        policy_network=MLP(layer_sizes=(16, 2)),
+        value_network=MLP(layer_sizes=(16, 1)),
+        action_distribution=distribution.NormalTanhDistribution,
+    )
+
+    # Set up a temporary directory for saving the policy
+    local_dir = Path("_test_train_ppo")
+    local_dir.mkdir(parents=True, exist_ok=True)
+    save_path = local_dir / "pendulum_policy.pkl"
+
+    # Train the agent
+    _, params, make_policy = train_ppo(
+        env=lambda: env,
+        network_wrapper=network_wrapper,
+        save_path=save_path,
+        tensorboard_logdir=local_dir,
+        num_timesteps=1000,
+        num_evals=3,
+        reward_scaling=0.1,
+        episode_length=200,
+        normalize_observations=True,
+        action_repeat=1,
+        unroll_length=5,
+        num_minibatches=8,
+        num_updates_per_batch=2,
+        discounting=0.97,
+        learning_rate=3e-4,
+        entropy_cost=0,
+        num_envs=64,
+        batch_size=32,
+        seed=0,
+    )
+
+    # Run a forward pass through the trained policy
+    policy = make_policy(params, deterministic=True)
+
+    # Check that the policy returns the correct action size
+    obs_rng, act_rng = jax.random.split(rng)
+    obs = jax.random.normal(obs_rng, (observation_size,))
+    action, _ = policy(obs, act_rng)
+    assert action.shape == (action_size,)
+
+    # Load the trained policy from disk
+    with Path(save_path).open("rb") as f:
+        loaded_network_and_params = pickle.load(f)
+    loaded_network_wrapper = loaded_network_and_params["network_wrapper"]
+    loaded_params = loaded_network_and_params["params"]
+
+    assert isinstance(loaded_network_wrapper, BraxPPONetworksWrapper)
+
+    # Check that the loaded policy returns the same action
+    loaded_policy = make_policy_function(
+        loaded_network_wrapper,
+        loaded_params,
+        observation_size,
+        action_size,
+        normalize_observations=True,
+        deterministic=True,
+    )
+    new_action, _ = loaded_policy(obs, act_rng)
+    assert jnp.allclose(action, new_action)
+
+    # Clean up
+    for p in local_dir.iterdir():
+        p.unlink()
+    local_dir.rmdir()
+
+
 if __name__ == "__main__":
     test_brax_env()
+    test_ppo()
