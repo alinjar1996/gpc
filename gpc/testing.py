@@ -1,5 +1,6 @@
 import time
 from functools import partial
+from typing import Union
 
 import jax
 import jax.numpy as jnp
@@ -9,6 +10,7 @@ from mujoco import mjx
 
 from gpc.envs import TrainingEnv
 from gpc.policy import Policy
+from gpc.sampling import BootstrappedPredictiveSampling
 
 
 def test_interactive(
@@ -91,3 +93,120 @@ def test_interactive(
 
     # Save what was last in the print buffer
     print("")
+
+
+def evaluate(
+    env: TrainingEnv,
+    policy: Union[Policy, BootstrappedPredictiveSampling],
+    num_initial_conditions: int,
+    inference_timestep: float = 0.1,
+    warm_start_level: float = 1.0,
+    num_loops: int = 1,
+    seed: int = 0,
+) -> None:
+    """Perform a systematic performance evaluation of a GPC policy.
+
+    Runs the policy from a randomized set of initial conditions, and reports
+    the total cost of each run.
+
+    Args:
+        env: The environment, which defines the system to simulate.
+        policy: The GPC policy to test.
+        num_initial_conditions: The number of initial conditions to test.
+        inference_timestep: The timestep dt to use for flow matching inference.
+        warm_start_level: The warm start level to use for the policy.
+        num_loops: The number of times to loop through the simulation.
+        seed: The random seed to use for the initial conditions.
+    """
+    rng = jax.random.key(seed)
+    task = env.task
+
+    # Set up the policy
+    if isinstance(policy, BootstrappedPredictiveSampling):
+
+        def policy_fn(
+            data: mjx.Data, action_tape: jax.Array, rng: jax.Array
+        ) -> jax.Array:
+            """Apply the policy, updating the given action sequence."""
+            data = mjx.forward(task.model, data)  # update sites & sensors
+
+            policy_params = policy.init_params()  # valid for PS/MPPI only
+            policy_params = policy_params.replace(
+                mean=action_tape,
+                rng=rng,
+            )
+
+            # Do the rollouts, storing the best one in the policy params
+            policy_params, _ = policy.optimize(data, policy_params)
+            return policy_params.mean
+
+        jit_policy = jax.jit(jax.vmap(policy_fn))
+
+    else:
+        policy = policy.replace(dt=inference_timestep)
+        policy.model.eval()
+
+        def policy_fn(
+            data: mjx.Data, action_tape: jax.Array, rng: jax.Array
+        ) -> jax.Array:
+            """Apply the policy, updating the given action sequence."""
+            data = mjx.forward(task.model, data)  # update sites & sensors
+            obs = env.get_obs(data)
+            action_tape = policy.apply(
+                action_tape, obs, rng, warm_start_level=warm_start_level
+            )
+            return action_tape
+
+        jit_policy = jax.jit(jax.vmap(policy_fn))
+
+    # Set the initial states
+    rng, init_rng = jax.random.split(rng)
+    init_rng = jax.random.split(init_rng, num_initial_conditions)
+    states = jax.jit(jax.vmap(env.init_state))(init_rng)
+
+    # Set up the simulation step function, x_{t+1} = f(x_t, u_t)
+    jit_step = jax.jit(jax.vmap(env.step))
+
+    # Set up the cost functions, l(x_t, u_t)
+    jit_running_cost = jax.jit(jax.vmap(env.task.running_cost))
+    jit_terminal_cost = jax.jit(jax.vmap(env.task.terminal_cost))
+
+    # Run the simulation
+    action_tapes = jnp.zeros(
+        (num_initial_conditions, task.planning_horizon, task.model.nu)
+    )
+    costs = jnp.zeros(num_initial_conditions)
+    num_sim_steps = int(task.planning_horizon * task.sim_steps_per_control_step)
+    for _ in range(num_loops):
+        for _ in range(num_sim_steps):
+            print(f"t = {states.data.time[0]:.2f}", end="\r")
+
+            # Get actions from the policy
+            action_rng = jax.random.split(rng, num_initial_conditions)
+            action_tapes = jit_policy(states.data, action_tapes, action_rng)
+            actions = action_tapes[:, 0, :]
+
+            # Evaluate costs at current state
+            costs += jit_running_cost(states.data, actions)
+
+            # Advance the state
+            states = jit_step(states, actions)
+
+        # Compute the terminal cost
+        costs += jit_terminal_cost(states.data)
+
+    # Normalize cost by the number of simulation steps
+    costs /= num_sim_steps * num_loops
+
+    # Print performance summary
+    final_time = states.data.time[0]
+    avg_cost = jnp.mean(costs)
+    std_cost = jnp.std(costs)
+
+    print(
+        (
+            f"Simulated from {num_initial_conditions} initial conditions "
+            f"for {final_time:.2f} seconds"
+        )
+    )
+    print(f"Average cost: {avg_cost:.2f} ± {std_cost:.2f}")

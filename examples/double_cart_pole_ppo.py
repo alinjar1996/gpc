@@ -88,7 +88,9 @@ if __name__ == "__main__":
     parser.add_argument("--train", action="store_true")
     parser.add_argument("--test", action="store_true")
     parser.add_argument(
-        "--save_path", type=str, default="/tmp/double_cart_pole_ppo"
+        "--save_path",
+        type=str,
+        default="/home/vkurtz/gpc_policies/rl_baselines/double_cart_pole_ppo",
     )
     args = parser.parse_args()
 
