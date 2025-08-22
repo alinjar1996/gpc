@@ -25,7 +25,7 @@ def train(path: str) -> None:
     log_path = path / time.strftime("%Y%m%d_%H%M%S")
 
     # Set up the environment
-    episode_length = 200
+    episode_length = 400
     env = BraxEnv(DoubleCartPoleEnv(episode_length))
 
     # Define value and policy networks
@@ -41,7 +41,7 @@ def train(path: str) -> None:
         network_wrapper=network_wrapper,
         save_path=save_path,
         tensorboard_logdir=log_path,
-        num_timesteps=163_840_000,  # matches GPC, 8192x400x50
+        num_timesteps=163_840_000,  # matches GPC, (16+16)x256x400x50
         num_evals=30,
         reward_scaling=1.0,
         episode_length=episode_length,
@@ -60,7 +60,7 @@ def train(path: str) -> None:
 
 def test(path: str) -> None:
     """Load a trained policy and test it with interactive simulation."""
-    env = DoubleCartPoleEnv(200)
+    env = DoubleCartPoleEnv(400)
 
     # Load the trained policy
     save_path = Path(path) / "double_cart_pole_policy.pkl"
