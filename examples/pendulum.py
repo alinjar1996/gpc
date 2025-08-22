@@ -9,7 +9,7 @@ from gpc.architectures import DenoisingMLP
 from gpc.envs import PendulumEnv
 from gpc.policy import Policy
 from gpc.sampling import BootstrappedPredictiveSampling
-from gpc.testing import test_interactive
+from gpc.testing import evaluate, test_interactive
 from gpc.training import train
 
 if __name__ == "__main__":
@@ -24,6 +24,11 @@ if __name__ == "__main__":
     subparsers.add_parser("test", help="Test a generative policy")
     subparsers.add_parser(
         "sample", help="Bootstrap sampling-based MPC with a generative policy"
+    )
+    subparsers.add_parser("eval", help="Evaluate a trained policy")
+    subparsers.add_parser(
+        "eval_bootstrapped",
+        help="Evaluate bootstrapped SPC with a generative policy",
     )
     args = parser.parse_args()
 
@@ -77,6 +82,26 @@ if __name__ == "__main__":
         mj_model = env.task.mj_model
         mj_data = mujoco.MjData(mj_model)
         run_sampling(ctrl, mj_model, mj_data, frequency=50)
+
+    elif args.task == "eval":
+        # Load the policy from a file and evaluate it
+        print(f"Loading policy from {save_file}")
+        policy = Policy.load(save_file)
+        evaluate(env, policy, num_initial_conditions=100, num_loops=20)
+
+    elif args.task == "eval_bootstrapped":
+        # Evaluate the bootstrapped policy
+        print(f"Loading policy from {save_file}")
+        policy = Policy.load(save_file)
+        ctrl = BootstrappedPredictiveSampling(
+            policy,
+            env.get_obs,
+            num_policy_samples=4,
+            task=env.task,
+            num_samples=4,
+            noise_level=0.1,
+        )
+        evaluate(env, ctrl, num_initial_conditions=100, num_loops=20)
 
     else:
         parser.print_help()
