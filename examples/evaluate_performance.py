@@ -10,7 +10,16 @@
 import pickle
 from typing import Tuple
 
-from gpc.envs import CartPoleEnv, PendulumEnv, TrainingEnv
+from gpc.envs import (
+    CartPoleEnv,
+    CraneEnv,
+    DoubleCartPoleEnv,
+    HumanoidEnv,
+    PendulumEnv,
+    PushTEnv,
+    TrainingEnv,
+    WalkerEnv,
+)
 from gpc.policy import Policy
 from gpc.rl.ppo import PolicyWrapper, make_policy_function
 from gpc.sampling import BootstrappedPredictiveSampling
@@ -120,9 +129,25 @@ if __name__ == "__main__":
     base_dir = "/home/vkurtz/gpc_policies"
 
     # Define settings for evaluation
-    envs = [PendulumEnv(200), CartPoleEnv(200)]
-    names = ["pendulum", "cart_pole"]
-    noise_levels = [0.1, 0.1]
+    envs = [
+        PendulumEnv(200),
+        CartPoleEnv(200),
+        DoubleCartPoleEnv(400),
+        PushTEnv(400),
+        WalkerEnv(500),
+        CraneEnv(500),
+        HumanoidEnv(400),
+    ]
+    names = [
+        "pendulum",
+        "cart_pole",
+        "double_cart_pole",
+        "pusht",
+        "walker",
+        "crane",
+        "humanoid",
+    ]
+    noise_levels = [0.1, 0.1, 0.3, 0.1, 0.3, 0.05, 0.5]
     assert len(envs) == len(names) == len(noise_levels)
 
     results = {}
@@ -133,7 +158,7 @@ if __name__ == "__main__":
         print("==> PPO")
         mean, std = eval_ppo(
             envs[i],
-            f"{base_dir}/rl_baselines/pendulum_ppo/{names[i]}_policy.pkl",
+            f"{base_dir}/rl_baselines/{names[i]}_ppo/{names[i]}_policy.pkl",
         )
         results[names[i]]["PPO"] = (mean, std)
         print("")

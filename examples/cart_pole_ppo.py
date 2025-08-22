@@ -118,7 +118,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--save_path",
         type=str,
-        default="/home/vkurtz/gpc_policies/rl_baselines/pendulum_ppo",
+        default="/home/vkurtz/gpc_policies/rl_baselines/cart_pole_ppo",
     )
     args = parser.parse_args()
 
