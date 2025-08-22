@@ -12,7 +12,8 @@ from brax.training.acme import running_statistics
 from brax.training.agents.ppo import train as ppo
 from brax.training.agents.ppo.networks import PPONetworks, make_inference_fn
 from brax.training.types import Params
-from flax import struct
+from flax import nnx, struct
+from flax.struct import dataclass
 from tensorboardX import SummaryWriter
 
 """
@@ -269,3 +270,25 @@ def make_policy_function(
     make_policy = make_inference_fn(ppo_networks)
     policy = make_policy(params, deterministic=deterministic)
     return policy
+
+
+@dataclass
+class PolicyWrapper:
+    """Policy wrapper to allow simple networks to use GPC eval tools."""
+
+    policy_fn: Callable
+    model: nnx.Module = nnx.Module()
+    u_min: jax.Array = None
+    u_max: jax.Array = None
+    dt: float = 0.1
+
+    def apply(
+        self,
+        prev: jax.Array,
+        obs: jax.Array,
+        rng: jax.Array,
+        warm_start_level: float = 0.0,
+    ) -> jax.Array:
+        """Generate an action (sequence) conditioned on an observation."""
+        action = self.policy_fn(obs, rng)[0]  # ignore log likelihood
+        return action[jnp.newaxis, :]  # add time dimension
