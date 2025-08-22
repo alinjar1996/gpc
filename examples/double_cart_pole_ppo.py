@@ -14,7 +14,7 @@ from gpc.rl.ppo import (
     make_policy_function,
     train_ppo,
 )
-from gpc.testing import test_interactive
+from gpc.testing import evaluate, test_interactive
 
 
 def train(path: str) -> None:
@@ -74,8 +74,8 @@ def test(path: str) -> None:
     policy_fn = make_policy_function(
         network_wrapper=network_wrapper,
         params=params,
-        observation_size=3,
-        action_size=1,
+        observation_size=env.observation_size,
+        action_size=env.task.model.nu,
         normalize_observations=True,
         deterministic=True,
     )
@@ -83,10 +83,37 @@ def test(path: str) -> None:
     test_interactive(env, policy)
 
 
+def eval(path: str) -> None:
+    """Load a trained policy and evaluate it."""
+    env = DoubleCartPoleEnv(400)
+
+    # Load the trained policy
+    save_path = Path(path) / "double_cart_pole_policy.pkl"
+    with open(save_path, "rb") as f:
+        network_and_params = pickle.load(f)
+    network_wrapper = network_and_params["network_wrapper"]
+    params = network_and_params["params"]
+
+    # Create a policy function that looks like GPC (even though it's just a
+    # simple feed-forward network)
+    policy_fn = make_policy_function(
+        network_wrapper=network_wrapper,
+        params=params,
+        observation_size=env.observation_size,
+        action_size=env.task.model.nu,
+        normalize_observations=True,
+        deterministic=True,
+    )
+    policy = PolicyWrapper(policy_fn)
+
+    evaluate(env, policy, num_initial_conditions=100, num_loops=12)
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--train", action="store_true")
     parser.add_argument("--test", action="store_true")
+    parser.add_argument("--eval", action="store_true")
     parser.add_argument(
         "--save_path",
         type=str,
@@ -98,5 +125,7 @@ if __name__ == "__main__":
         train(args.save_path)
     elif args.test:
         test(args.save_path)
+    elif args.eval:
+        eval(args.save_path)
     else:
         parser.print_help()

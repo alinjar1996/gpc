@@ -5,7 +5,7 @@ from pathlib import Path
 
 from brax.training import distribution
 
-from gpc.envs import PendulumEnv
+from gpc.envs import CartPoleEnv
 from gpc.rl.envs import BraxEnv
 from gpc.rl.ppo import (
     MLP,
@@ -21,17 +21,17 @@ def train(path: str) -> None:
     """Train a PPO policy and save it."""
     path = Path(path + "/")
     Path.mkdir(path, exist_ok=True)
-    save_path = path / "pendulum_policy.pkl"
+    save_path = path / "cart_pole_policy.pkl"
     log_path = path / time.strftime("%Y%m%d_%H%M%S")
 
     # Set up the environment
     episode_length = 200
-    env = BraxEnv(PendulumEnv(episode_length))
+    env = BraxEnv(CartPoleEnv(episode_length))
 
     # Define value and policy networks
     network_wrapper = BraxPPONetworksWrapper(
-        policy_network=MLP(layer_sizes=(32, 32, 2)),
-        value_network=MLP(layer_sizes=(32, 32, 1)),
+        policy_network=MLP(layer_sizes=(64, 64, 2)),
+        value_network=MLP(layer_sizes=(64, 64, 1)),
         action_distribution=distribution.NormalTanhDistribution,
     )
 
@@ -41,7 +41,7 @@ def train(path: str) -> None:
         network_wrapper=network_wrapper,
         save_path=save_path,
         tensorboard_logdir=log_path,
-        num_timesteps=2_560_000,
+        num_timesteps=(8 + 2) * 128 * 200 * 10,  # matches GPC
         num_evals=10,
         reward_scaling=1.0,
         episode_length=episode_length,
@@ -60,10 +60,10 @@ def train(path: str) -> None:
 
 def test(path: str) -> None:
     """Load a trained policy and test it with interactive simulation."""
-    env = PendulumEnv(200)
+    env = CartPoleEnv(200)
 
     # Load the trained policy
-    save_path = Path(path) / "pendulum_policy.pkl"
+    save_path = Path(path) / "cart_pole_policy.pkl"
     with open(save_path, "rb") as f:
         network_and_params = pickle.load(f)
     network_wrapper = network_and_params["network_wrapper"]
@@ -85,10 +85,10 @@ def test(path: str) -> None:
 
 def eval(path: str) -> None:
     """Load a trained policy and compute average costs from random x0."""
-    env = PendulumEnv(200)
+    env = CartPoleEnv(200)
 
     # Load the trained policy
-    save_path = Path(path) / "pendulum_policy.pkl"
+    save_path = Path(path) / "cart_pole_policy.pkl"
     with open(save_path, "rb") as f:
         network_and_params = pickle.load(f)
     network_wrapper = network_and_params["network_wrapper"]
