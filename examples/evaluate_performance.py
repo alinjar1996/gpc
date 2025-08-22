@@ -10,7 +10,7 @@
 import pickle
 from typing import Tuple
 
-from gpc.envs import PendulumEnv, TrainingEnv
+from gpc.envs import CartPoleEnv, PendulumEnv, TrainingEnv
 from gpc.policy import Policy
 from gpc.rl.ppo import PolicyWrapper, make_policy_function
 from gpc.sampling import BootstrappedPredictiveSampling
@@ -44,7 +44,7 @@ def eval_ppo(
         * env.task.model.opt.timestep
     )
     return evaluate(
-        env, policy, num_initial_conditions=100, num_loops=num_loops
+        env, policy, num_initial_conditions=100, num_loops=int(num_loops)
     )
 
 
@@ -116,14 +116,51 @@ def eval_spc(
 
 
 if __name__ == "__main__":
-    env = PendulumEnv(200)
-
+    # Location of saved policies
     base_dir = "/home/vkurtz/gpc_policies"
 
-    mean, std = eval_ppo(
-        env, f"{base_dir}/rl_baselines/pendulum_ppo/pendulum_policy.pkl"
-    )
-    mean, std = eval_gpc(env, f"{base_dir}/pendulum_policy.pkl")
-    mean, std = eval_gpc_plus(env, f"{base_dir}/pendulum_policy.pkl")
-    mean, std = eval_spc(env, f"{base_dir}/pendulum_policy.pkl")
-    print(mean, std)
+    # Define settings for evaluation
+    envs = [PendulumEnv(200), CartPoleEnv(200)]
+    names = ["pendulum", "cart_pole"]
+    noise_levels = [0.1, 0.1]
+    assert len(envs) == len(names) == len(noise_levels)
+
+    results = {}
+    for i in range(len(envs)):
+        print(f"Evaluating {names[i]} performance")
+        results[names[i]] = {}
+
+        print("==> PPO")
+        mean, std = eval_ppo(
+            envs[i],
+            f"{base_dir}/rl_baselines/pendulum_ppo/{names[i]}_policy.pkl",
+        )
+        results[names[i]]["PPO"] = (mean, std)
+        print("")
+
+        print("==> SPC")
+        mean, std = eval_spc(
+            envs[i],
+            f"{base_dir}/{names[i]}_policy.pkl",
+            noise_level=noise_levels[i],
+        )
+        results[names[i]]["SPC"] = (mean, std)
+        print("")
+
+        print("==> GPC")
+        mean, std = eval_gpc(envs[i], f"{base_dir}/{names[i]}_policy.pkl")
+        results[names[i]]["GPC"] = (mean, std)
+        print("")
+
+        print("==> GPC+")
+        mean, std = eval_gpc_plus(
+            envs[i],
+            f"{base_dir}/{names[i]}_policy.pkl",
+            noise_level=noise_levels[i],
+        )
+        results[names[i]]["GPC+"] = (mean, std)
+        print("")
+
+    # Save results
+    with open("evaluation_results.pkl", "wb") as f:
+        pickle.dump(results, f)
