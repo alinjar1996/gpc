@@ -210,3 +210,4 @@ def evaluate(
         )
     )
     print(f"Average cost: {avg_cost:.2f} ± {std_cost:.2f}")
+    return avg_cost, std_cost
