@@ -45,7 +45,7 @@ def test_interactive(
     if use_action_inpainting:
         # We'll use action inpainting with exponentially decayed weights,
         # as in https://arxiv.org/pdf/2506.07339.
-        start = 2
+        start = 1
         end = task.planning_horizon - 2
         weights = jnp.clip(
             (start - 1 - jnp.arange(task.planning_horizon)) / (end - start + 1)
@@ -119,6 +119,7 @@ def evaluate(
     num_initial_conditions: int,
     inference_timestep: float = 0.1,
     warm_start_level: float = 1.0,
+    use_action_inpainting: bool = False,
     num_loops: int = 1,
     seed: int = 0,
 ) -> None:
@@ -133,6 +134,7 @@ def evaluate(
         num_initial_conditions: The number of initial conditions to test.
         inference_timestep: The timestep dt to use for flow matching inference.
         warm_start_level: The warm start level to use for the policy.
+        use_action_inpainting: Whether to use action inpainting warm-starts.
         num_loops: The number of times to loop through the simulation.
         seed: The random seed to use for the initial conditions.
     """
@@ -164,16 +166,28 @@ def evaluate(
         policy = policy.replace(dt=inference_timestep)
         policy.model.eval()
 
+        # Weights for action inpainting (if requested)
+        start = 1
+        end = task.planning_horizon - 2
+        weights = jnp.clip(
+            (start - 1 - jnp.arange(task.planning_horizon)) / (end - start + 1)
+            + 1,
+            0,
+            1,
+        )
+        weights *= jnp.expm1(weights) / (jnp.e - 1)
+
         def policy_fn(
             data: mjx.Data, action_tape: jax.Array, rng: jax.Array
         ) -> jax.Array:
             """Apply the policy, updating the given action sequence."""
             data = mjx.forward(task.model, data)  # update sites & sensors
             obs = env.get_obs(data)
-            action_tape = policy.apply(
+            if use_action_inpainting:
+                return policy.apply_inpainting(action_tape, obs, weights, rng)
+            return policy.apply(
                 action_tape, obs, rng, warm_start_level=warm_start_level
             )
-            return action_tape
 
         jit_policy = jax.jit(jax.vmap(policy_fn))
 
