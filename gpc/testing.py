@@ -19,6 +19,7 @@ def test_interactive(
     mj_data: mujoco.MjData = None,
     inference_timestep: float = 0.1,
     warm_start_level: float = 1.0,
+    use_action_inpainting: bool = False,
 ) -> None:
     """Test a GPC policy with an interactive simulation.
 
@@ -28,6 +29,8 @@ def test_interactive(
         mj_data: The initial state for the simulation.
         inference_timestep: The timestep dt to use for flow matching inference.
         warm_start_level: The warm start level to use for the policy.
+        use_action_inpainting: Whether to use action inpainting rather than
+        warm-starts.
     """
     rng = jax.random.key(0)
     task = env.task
@@ -38,6 +41,21 @@ def test_interactive(
     jit_policy = jax.jit(
         partial(policy.apply, warm_start_level=warm_start_level)
     )
+
+    if use_action_inpainting:
+        # We'll use action inpainting with exponentially decayed weights,
+        # as in https://arxiv.org/pdf/2506.07339.
+        start = 2
+        end = task.planning_horizon - 2
+        weights = jnp.clip(
+            (start - 1 - jnp.arange(task.planning_horizon)) / (end - start + 1)
+            + 1,
+            0,
+            1,
+        )
+        weights *= jnp.expm1(weights) / (jnp.e - 1)
+
+        jit_policy = jax.jit(partial(policy.apply_inpainting, weights=weights))
 
     # Set up the mujoco simultion
     mj_model = task.mj_model
@@ -73,7 +91,7 @@ def test_interactive(
             # Update the action sequence
             inference_start = time.time()
             rng, policy_rng = jax.random.split(rng)
-            actions = jit_policy(actions, obs, policy_rng)
+            actions = jit_policy(prev=actions, y=obs, rng=policy_rng)
             mj_data.ctrl[:] = actions[0]
 
             inference_time = time.time() - inference_start

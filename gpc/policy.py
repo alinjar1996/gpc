@@ -158,7 +158,7 @@ class Policy:
 
             return U, t + self.dt
 
-        # While t < 1, U += dt * model(U, y, t)
+        # While t < 1, U += dt * (model(U, y, t) + inpainting correction)
         U, t = jax.lax.while_loop(
             lambda args: jnp.all(args[1] < 1.0),
             _step,
