@@ -104,3 +104,77 @@ class Policy:
         U = U * scale + mean
 
         return U
+
+    def apply_inpainting(
+        self,
+        prev: jax.Array,
+        y: jax.Array,
+        weights: jax.Array,
+        rng: jax.Array,
+    ) -> jax.Array:
+        """Generate an action sequence conditioned on the observation.
+
+        Args:
+            prev: The previous action sequence.
+            y: The current observation.
+            weights: The inpainting weight for each time step, in [0, 1].
+            rng: The random number generator key.
+
+        Uses action inpainting (https://arxiv.org/pdf/2506.07339, eq. 2) to
+        condition on the previous action sequence. Weights are applied to each
+        action in the sequence, typically we have w = 1 early in the trajectory,
+        decaying to w = 0 at the end. 
+
+        Returns:
+            The updated action sequence
+        """
+        # Normalize the observation, but don't update the stored statistics
+        y = self.normalizer(y, use_running_average=True)
+
+        # Set the initial sample
+        U = jax.random.normal(rng, prev.shape)
+
+        def predicted_final(U, y, t):
+            """Compute Uhat = U + (1-t) model(U, y, t)"""
+            return U + (1 - t) * self.model(U, y, t)
+        
+
+        t = jnp.zeros(1)
+        while t < 1.0:
+            U += self.dt * self.model(U, y, t)
+
+            calc_uhat = lambda U: predicted_final(U, y, t)
+            U_hat, U_hat_vjp = jax.vjp(calc_uhat, U)
+
+            weighted_diff = ((prev - U_hat).T * weights).T
+            beta = 5.0
+            r_squared = (1 - t)**2 / (t**2 + (1 - t)**2)
+            multiplier = (1 - t) / (t * r_squared)
+            scaled_weighted_diff = weighted_diff * jnp.minimum(beta, multiplier)
+            correction = U_hat_vjp(scaled_weighted_diff)[0]
+
+            U += self.dt * correction
+
+            U = jax.numpy.clip(U, -1, 1)
+            t += self.dt
+
+        # def _step(args: Tuple[jax.Array, float]) -> Tuple[jax.Array, float]:
+        #     """Flow the sample U along the learned vector field."""
+        #     U, t = args
+        #     U += self.dt * self.model(U, y, t)
+        #     U = jax.numpy.clip(U, -1, 1)
+        #     return U, t + self.dt
+
+        # # While t < 1, U += dt * model(U, y, t)
+        # U, t = jax.lax.while_loop(
+        #     lambda args: jnp.all(args[1] < 1.0),
+        #     _step,
+        #     (U, jnp.zeros(1)),
+        # )
+
+        # Rescale actions from [-1, 1] to [u_min, u_max]
+        mean = (self.u_max + self.u_min) / 2
+        scale = (self.u_max - self.u_min) / 2
+        U = U * scale + mean
+
+        return U
