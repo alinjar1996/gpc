@@ -77,6 +77,16 @@ if __name__ == "__main__":
         print(f"Evaluating {names[i]} performance")
         results[names[i]] = {}
 
+        print("==> Action inpainting")
+        mean, std = eval_gpc(
+            envs[i],
+            f"{base_dir}/{names[i]}_policy.pkl",
+            warm_start_level=0.0,
+            use_action_inpainting=True,
+        )
+        results[names[i]]["Action\nInpainting"] = (mean, std)
+        print("")
+
         print("==> No warm start")
         mean, std = eval_gpc(
             envs[i],
@@ -84,7 +94,7 @@ if __name__ == "__main__":
             warm_start_level=0.0,
             use_action_inpainting=False,
         )
-        results[names[i]]["no_warm_start"] = (mean, std)
+        results[names[i]]["α = 0"] = (mean, std)
         print("")
 
         print("==> Partial warm start")
@@ -94,7 +104,7 @@ if __name__ == "__main__":
             warm_start_level=0.5,
             use_action_inpainting=False,
         )
-        results[names[i]]["partial_warm_start"] = (mean, std)
+        results[names[i]]["α = 0.5"] = (mean, std)
         print("")
 
         print("==> Full warm start")
@@ -104,16 +114,8 @@ if __name__ == "__main__":
             warm_start_level=1.0,
             use_action_inpainting=False,
         )
-        results[names[i]]["full_warm_start"] = (mean, std)
-
-        print("==> Action inpainting")
-        mean, std = eval_gpc(
-            envs[i],
-            f"{base_dir}/{names[i]}_policy.pkl",
-            warm_start_level=0.0,
-            use_action_inpainting=True,
-        )
-        results[names[i]]["action_inpainting"] = (mean, std)
+        results[names[i]]["α = 1.0"] = (mean, std)
+        print("")
 
     # Save results
     with open("warm_start_eval_results.pkl", "wb") as f:

@@ -46,7 +46,7 @@ def test_interactive(
         # We'll use action inpainting with exponentially decayed weights,
         # as in https://arxiv.org/pdf/2506.07339.
         start = 1
-        end = task.planning_horizon - 2
+        end = jnp.maximum(start, task.planning_horizon - 2)
         weights = jnp.clip(
             (start - 1 - jnp.arange(task.planning_horizon)) / (end - start + 1)
             + 1,
@@ -168,7 +168,7 @@ def evaluate(
 
         # Weights for action inpainting (if requested)
         start = 1
-        end = task.planning_horizon - 2
+        end = jnp.maximum(start, task.planning_horizon - 2)
         weights = jnp.clip(
             (start - 1 - jnp.arange(task.planning_horizon)) / (end - start + 1)
             + 1,
